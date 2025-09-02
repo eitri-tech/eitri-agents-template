@@ -13,9 +13,6 @@ module.exports = {
   organizationId: "749489a4-f129-4461-9da1-4b2d2a38dd5e",
   organization: {},
   "eitri-app-dependencies": {
-    i18n: {
-      version: "14.1.2",
-    },
     "eitri-shopping-vtex-shared": { version: "1.3.4", isEitriAppShared: true },
   },
   type: "module",

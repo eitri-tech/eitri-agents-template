@@ -1,6 +1,7 @@
 import Eitri from "eitri-bifrost";
-import { View, Text } from "eitri-luminus";
-import { useLocalShoppingCart } from "../providers/LocalCart";
+import { View, Text, Image } from "eitri-luminus";
+import { useLocalShoppingCart, } from "../providers/LocalCart";
+import ShoppingCart from '../assets/icons/shopping-cart.svg'
 
 export default function HeaderComponent(props) {
   const { cart } = useLocalShoppingCart(); // Assuming useCart returns a cart object
@@ -27,9 +28,9 @@ export default function HeaderComponent(props) {
               });
             }}
           >
-            <Text className="text-white">Cart</Text>
             <View className="indicator">
-              <Text className="indicator-item badge badge-secondary text-sm ml-2">
+              <Image src={ShoppingCart} alt="Shopping Cart Icon" className="w-8 h-8 mt-1" />
+              <Text className="indicator-item badge badge-secondary text-sm ml-4">
                 {cartItemsCount}
               </Text>
             </View>
