@@ -46,6 +46,16 @@ export default function Home(props) {
         >
           Navegar para Document
         </Button>
+        <Button
+          className="mt-4 w-full"
+          onClick={async () =>
+            await Eitri.navigation.navigate({
+              path: "/Audio",
+            })
+          }
+        >
+          Navegar para Audio
+        </Button>
         <Text className="text-white text-xs mt-12">
           v{window.__eitriAppConf.version}
         </Text>
