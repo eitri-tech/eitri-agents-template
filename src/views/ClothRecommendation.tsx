@@ -1,18 +1,21 @@
 import { useState } from "react";
-import { Page, Text, View, Button, Image, Carousel } from "eitri-luminus";
+import { Page, Text, View, Button, Image, Carousel, Loading, Alert } from "eitri-luminus";
 import Eitri from "eitri-bifrost";
 import { AgentRole, useAgent } from "eitri-agents";
 import { ClothRecommendationType } from "../types/Recommendation";
-import { ProductService } from "../services/ProductService";
-import { Product } from "../types/Product";
+import { OptimizeProductResponse, Product } from "../types/Product";
 
 export default function ClothRecommendation() {
+    const agent = useAgent("Fashion", {
+        verbose: true,
+    });
+
+    const [error, setError] = useState<string | null>(null);
     const [image, setImage] = useState<{ data: string; mimeType: string } | null>(
         null
     );
     const [isFetching, setIsFetching] = useState(false);
-    const [products, setProducts] = useState<Record<string, Product[]>>({});
-    const agent = useAgent("Fashion", { verbose: false });
+    const [products, setProducts] = useState<Record<string, OptimizeProductResponse[]>>({});
     const [recommendation, setRecommendation] =
         useState<ClothRecommendationType | null>(null);
 
@@ -29,6 +32,7 @@ export default function ClothRecommendation() {
                 });
             }
         } catch (error) {
+            setError("Falha ao pegar imagem");
             console.error("Image pick failed:", error);
         }
     };
@@ -46,7 +50,7 @@ export default function ClothRecommendation() {
 
             const response = await agent.call({
                 content:
-                    "Forneça uma recomendação de estilo baseado na imagem. Foque somente nas roupas e acessórios.",
+                    "Forneça uma recomendação de estilo. Foque somente nas roupas e acessórios.",
                 role: AgentRole.User,
                 file: {
                     mimeType: image.mimeType,
@@ -54,36 +58,63 @@ export default function ClothRecommendation() {
                 },
             });
 
-            const jsonData = agent.helper.json.extract<ClothRecommendationType>(
+            const jsonData = agent.helper.json.extract<Record<string, OptimizeProductResponse[]>>(
                 response.message
             );
 
+
             if (!jsonData) {
-                setIsFetching(false);
-                return;
+                console.warn(jsonData)
+                console.error("Error parsing JSON data")
+                setError("Erro ao processar dados")
+                return
             }
 
-            setRecommendation(jsonData);
+            if (Object.keys(jsonData).length === 0) {
+                console.warn(jsonData)
+                setError("Houve um erro inesperado, tente novamente por favor.")
+                return
+            }
 
-            const promises = jsonData.items.map((item) =>
-                ProductService.getProducts(item.name, item.name)
-            );
-
-            const data = await Promise.all(promises);
-
-            setProducts(
-                data.reduce((acc, curr) => {
-                    acc[curr.name] = curr.products || [];
-                    return acc;
-                }, {} as Record<string, Product[]>)
-            );
+            setProducts(jsonData)
 
             setIsFetching(false);
         } catch (error) {
             setIsFetching(false);
             console.error("Error fetching products:", error);
+            setError("Erro ao buscar produtos")
         }
     };
+
+    const handleRetry = () => {
+        setError(null);
+        setIsFetching(false);
+        setImage(null);
+        setRecommendation(null);
+    };
+
+    if (error) {
+        return (
+            <Page className="w-full min-h-screen bg-gradient-to-br from-[#1a1a1a] via-[#292929] to-[#1a1a1a] flex flex-col py-8 pt-10">
+                <View className="w-full max-w-6xl mx-auto flex flex-col h-full px-4 sm:px-6 lg:px-8">
+                    <View className="text-center flex flex-col mb-8">
+                        <Text className="text-white text-3xl font-bold mb-2 mt-4">Houve um erro!</Text>
+                        <Alert className="bg-red-500 flex flex-col items-center">
+                            <Text className="text-white text-xl font-bold">
+                                {error} 😔
+                            </Text>
+                        </Alert>
+                        <Button
+                            onClick={handleRetry}
+                            className="mt-8"
+                        >
+                            Tentar novamente
+                        </Button>
+                    </View>
+                </View>
+            </Page>
+        );
+    }
 
     return (
         <Page
@@ -92,7 +123,7 @@ export default function ClothRecommendation() {
         >
             <View className="w-full max-w-6xl mx-auto flex flex-col h-full px-4 sm:px-6 lg:px-8">
                 <View className="text-center flex flex-col mb-8">
-                    <Text className="text-white text-3xl font-bold mb-2">
+                    <Text className="text-white text-3xl font-bold mb-2 mt-4">
                         Style Recommendation
                     </Text>
                     <Text className="text-gray-300">
@@ -133,8 +164,11 @@ export default function ClothRecommendation() {
                     </View>
                 )}
 
+
+
                 {isFetching && (
                     <View className="flex flex-col items-center justify-center my-12">
+                        <Loading className="loading-spinner loading-md text-[#9DE82B] mb-4" />
                         <Text className="text-2xl font-bold text-[#F0F0F0] text-center">
                             {recommendation
                                 ? "Finding products..."
@@ -168,14 +202,10 @@ export default function ClothRecommendation() {
                                 config={{
                                     autoPlay: false,
                                 }}
-                                className="w-full"
+                                className="w-full mt-4"
                             >
                                 {productList.map((product) => {
-                                    const firstItem = product.items?.[0];
-                                    if (!firstItem) return null;
 
-                                    const firstImage = firstItem.images?.[0]?.imageUrl;
-                                    const price = firstItem.sellers?.[0]?.commertialOffer?.Price;
 
                                     return (
                                         <Carousel.Item
@@ -183,34 +213,24 @@ export default function ClothRecommendation() {
                                             key={product.productId}
                                         >
                                             <View className="flex flex-col h-full bg-gray-800/50 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden border border-gray-700 hover:border-[#9DE82B] transition duration-300 ease-in-out transform hover:-translate-y-1 mx-1">
-                                                {firstImage ? (
-                                                    <View className="relative h-32 pt-[100%]">
-                                                        <Image
-                                                            src={firstImage}
-                                                            className="absolute inset-0 w-full h-full object-cover"
-                                                        />
-                                                    </View>
-                                                ) : (
-                                                    <View className="bg-gray-700 h-32 flex items-center justify-center">
-                                                        <Text className="text-gray-400">No image</Text>
-                                                    </View>
-                                                )}
+                                                <View className="relative h-32 pt-[100%]">
+                                                    <Image
+                                                        src={product.imageUrl}
+                                                        className="absolute inset-0 w-full h-full object-cover"
+                                                    />
+                                                </View>
+
                                                 <View className="p-3 flex flex-col flex-grow">
                                                     <Text className="text-white font-medium text-center mb-1 line-clamp-2 text-sm">
                                                         {product.productName}
                                                     </Text>
-                                                    {price ? (
-                                                        <Text className="text-[#9DE82B] font-bold text-center mt-auto">
-                                                            {price.toLocaleString("pt-BR", {
-                                                                style: "currency",
-                                                                currency: "BRL",
-                                                            })}
-                                                        </Text>
-                                                    ) : (
-                                                        <Text className="text-gray-400 text-center text-xs mt-auto">
-                                                            Price unavailable
-                                                        </Text>
-                                                    )}
+                                                    <Text className="text-[#9DE82B] font-bold text-center mt-auto">
+                                                        {product.price.toLocaleString("pt-BR", {
+                                                            style: "currency",
+                                                            currency: "BRL",
+                                                        })}
+                                                    </Text>
+
                                                 </View>
                                             </View>
                                         </Carousel.Item>

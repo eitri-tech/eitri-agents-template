@@ -258,3 +258,10 @@ export enum SpecificationGroupName {
   ItensInclusos = "Itens Inclusos",
   Observações = "Observações",
 }
+
+export interface OptimizeProductResponse {
+  productId: string;
+  productName: string;
+  imageUrl: string;
+  price: number;
+}
