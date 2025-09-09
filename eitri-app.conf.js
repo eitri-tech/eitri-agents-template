@@ -2,7 +2,7 @@ module.exports = {
   name: "eitri-poc-ai",
   title: "eitri-poc-ai",
   slug: "eitri-poc-ai",
-  "eitri-luminus": "2.4.1",
+  "eitri-luminus": "2.5.0",
   "eitri-bifrost": "3.10.0",
   "eitri-commons": "2.1.2",
   "eitri-agents": "1.4.8",
