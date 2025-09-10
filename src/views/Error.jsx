@@ -1,3 +1,4 @@
+import { useAgent } from 'eitri-agents'
 import Eitri from 'eitri-bifrost'
 import GenericError from 'src/components/Error/GenericError'
 export default function Error() {

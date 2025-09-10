@@ -9,7 +9,6 @@ import {
 } from "eitri-luminus";
 import { useState, useEffect } from "react";
 import Robot from "../assets/images/robot.png";
-import { IoSend } from "react-icons/io5";
 import HeaderComponent from "../components/HeaderComponent";
 
 import { AgentRole, useAgent } from "eitri-agents";
@@ -20,7 +19,7 @@ export default function ChatPage(props) {
   const [messages, setMessages] = useState([]);
 
   const agent = useAgent("SellerAgent", {
-    verbose: true,
+    verbose: true
   });
 
   const scrollToBottom = () => {
@@ -199,7 +198,7 @@ export default function ChatPage(props) {
                 </View>
               ) : (
                 <View className="flex items-center">
-                  <IoSend className="text-lg !text-[#292929]" />
+                  <Text className="!text-[#292929]" >Enviar</Text>
                 </View>
               )}
             </Button>
