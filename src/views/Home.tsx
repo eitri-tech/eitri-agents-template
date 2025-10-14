@@ -8,6 +8,7 @@ import {
   Markdown,
 } from "eitri-luminus";
 import Eitri from "eitri-bifrost";
+import {  } from 'react-icons/fa'
 
 export default function Home(props) {
   return (

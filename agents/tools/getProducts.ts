@@ -13,12 +13,11 @@ export default async function getProducts(args: GetProductArgsType) {
       hideUnavailableItems: true,
     });
 
-    return data.products.slice(0, 5).map((product) => ({
+    return data.products.map((product) => ({
       productId: product.productId || product.id || product.productI,
       productName: product.productName,
       images: product.items?.[0]?.images,
       price: product.items?.[0]?.sellers?.[0]?.commertialOffer?.Price,
-      description: product?.description?.substring(0, 300),
     }));
   } catch (error) {
     console.error("Error fetching products from VTEX API:", error);

@@ -3,206 +3,291 @@ import {
   View,
   Button,
   Page,
-  Chat,
   TextInput,
-  Markdown,
+  Image,
 } from "eitri-luminus";
-import { useState, useEffect } from "react";
-import Robot from "../assets/images/robot.png";
+import { useState } from "react";
 import HeaderComponent from "../components/HeaderComponent";
 
 import { AgentRole, useAgent } from "eitri-agents";
 
-export default function ChatPage(props) {
+export interface Product {
+  productId: string;
+  productName: string;
+  images: Array<{
+    imageUrl: string;
+  }>;
+  price: number;
+}
+
+interface InfoCard {
+  id: string;
+  type: "info";
+  title: string;
+  subtitle?: string;
+  icon: string;
+  bgColor: string;
+  searchQuery?: string; // Query to trigger when card is clicked
+}
+
+type GridItem = Product | InfoCard;
+
+export default function ChatPage() {
   const [value, setValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState([]);
+  const [searchResults, setSearchResults] = useState<GridItem[]>([]);
 
   const agent = useAgent("SellerAgent", {
-    verbose: true
+    verbose: true,
+    // llm: 'openai',
+    // model: 'gpt-5',
+    llm: 'gemini',
+    model: 'gemini-2.5-flash'
   });
 
-  const scrollToBottom = () => {
-    const chatContainer = document.getElementById("chat-container");
-    if (chatContainer) {
-      chatContainer.scrollTop = chatContainer.scrollHeight;
-    }
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      scrollToBottom();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [messages, isLoading]);
-
-  const askAgent = async (message: string) => {
-    if (!message.trim()) {
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) {
       return;
     }
 
-    const messagesToSend = {
-      role: AgentRole.User,
-      content: message,
-    };
-
-    setMessages(prevState => [...prevState, messagesToSend]);
-
-    setTimeout(scrollToBottom, 100);
-    setValue("");
     setIsLoading(true);
+    setValue(query);
 
     try {
-      const response = await agent.call(messagesToSend);
+      const response = await agent.call({
+        role: AgentRole.User,
+        content: `${query}`,
+      }, {
+        skipSentToolResultToAgent: true
+      });
 
-      let newMessage = response.message;
+      if (!response.rawToolResult) {
+        console.warn('No raw tool result found')
+        return
+      }
 
-      setMessages(prevState => [...prevState, { role: "assistant", content: newMessage }]);
+      console.log(response.rawToolResult)
 
-      setTimeout(scrollToBottom, 200);
+      const data = response.rawToolResult
+
+      // Parse the products from the agent response
+      if (Array.isArray(data)) {
+        const products = data.filter((item): item is Product => 'productId' in item);
+        const mergedResults = mergeInfoCards(products);
+        setSearchResults(mergedResults);
+      } else {
+        setSearchResults([]);
+      }
     } catch (error) {
-      console.error("Error asking Agent:", error);
-      setTimeout(scrollToBottom, 200);
+      console.error("Error searching:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleKeyPress = (event) => {
+  const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
-      askAgent(value);
+      handleSearch(value);
     }
+  };
+
+  const handleInfoCardClick = (searchQuery: string) => {
+    setValue(searchQuery);
+    handleSearch(searchQuery);
+  };
+
+  const mergeInfoCards = (products: Product[]): GridItem[] => {
+    const suggestions: InfoCard[] = [
+      {
+        id: "info-1",
+        type: "info",
+        title: "Presentes a partir de",
+        subtitle: "R$ 39,99",
+        icon: "✨",
+        bgColor: "bg-purple-100",
+        searchQuery: "Presentes até 50 reais"
+      },
+      {
+        id: "info-2",
+        type: "info",
+        title: "Listras: a queridinha da estação",
+        icon: "✓",
+        bgColor: "bg-purple-100",
+        searchQuery: "Roupas com listras"
+      },
+      {
+        id: "info-3",
+        type: "info",
+        title: "Chegou agora as tendências de verão",
+        icon: "🌺",
+        bgColor: "bg-purple-100",
+        searchQuery: "Tendências verão"
+      },
+      {
+        id: "info-4",
+        type: "info",
+        title: "Looks para o trabalho",
+        icon: "💼",
+        bgColor: "bg-blue-100",
+        searchQuery: "Roupas profissionais"
+      },
+      {
+        id: "info-5",
+        type: "info",
+        title: "Esportivo e casual",
+        icon: "👟",
+        bgColor: "bg-green-100",
+        searchQuery: "Roupas esportivas"
+      }
+    ];
+
+    // Intelligently merge info cards with products
+    const result: GridItem[] = [];
+    const infoCardInterval = Math.max(3, Math.floor(products.length / suggestions.length));
+
+    let infoCardIndex = 0;
+    products.forEach((product, index) => {
+      result.push(product);
+
+      // Insert an info card after every few products
+      if ((index + 1) % infoCardInterval === 0 && infoCardIndex < suggestions.length) {
+        result.push(suggestions[infoCardIndex]);
+        infoCardIndex++;
+      }
+    });
+
+    // Add remaining info cards if there's space
+    while (infoCardIndex < suggestions.length && result.length < 12) {
+      result.push(suggestions[infoCardIndex]);
+      infoCardIndex++;
+    }
+
+    return result;
   };
 
   return (
     <Page
-      className="w-full h-screen bg-gradient-to-br from-[#292929] via-[#1a1a1a] to-[#292929] flex flex-col pt-8"
-      statusBarTextColor="white"
+      className="w-full h-screen bg-white flex flex-col"
+      statusBarTextColor="black"
     >
-      <View className="w-full max-w-6xl mx-auto flex flex-col h-full">
-        <HeaderComponent />
+      <View className="w-full max-w-6xl mx-auto flex flex-col h-full pt-12">
 
-        {/* Chat Area */}
-        <View
-          id="chat-container"
-          className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-transparent to-[#292929]/20"
-        >
-          {messages.length === 0 && (
-            <View className="flex flex-col items-center justify-center h-full text-center space-y-4">
-              <View className="flex items-center space-x-2">
-                <Text className="text-2xl font-bold text-[#F0F0F0]">
-                  Olá! Eu sou o Assistente de vendas
-                </Text>
-              </View>
-              <Text className="text-[#F0F0F0]/70 max-w-md flex items-center justify-center space-x-2">
-                <Text>
-                  Seu assistente de vendas inteligente. Como posso ajudá-lo
-                  hoje?
-                </Text>
-              </Text>
+        {/* Search Bar with Camera Icon */}
+        <View className="p-4 bg-white border-b border-gray-200">
+          <View className="flex items-center space-x-3 bg-gray-100 rounded-full px-4 py-3">
+            <View className="text-gray-400">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
             </View>
-          )}
-
-          <Chat>
-            {messages.map((message, index) => (
-              <View key={`message-${index}`} className="mb-6">
-                {message.role === "user" ? (
-                  <Chat.End>
-                    <Chat.Bubble className="bg-gradient-to-r from-[#9DE82B] to-[#7BC41F] text-[#292929] shadow-xl max-w-lg border border-[#9DE82B]/40 backdrop-blur-sm">
-                      <Text className="text-[#292929] font-medium">
-                        {message.content}
-                      </Text>
-                    </Chat.Bubble>
-                  </Chat.End>
-                ) : (
-                  <Chat.Start>
-                    <View className="relative mr-3">
-                      <Chat.Image
-                        src={Robot}
-                        alt="Eitri's Avatar"
-                        className="w-12 h-12 rounded-full border-2 border-[#9DE82B] shadow-lg bg-gradient-to-r from-[#9DE82B] to-[#7BC41F] p-1"
-                      />
-                      <View className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#9DE82B] rounded-full border-2 border-[#292929]"></View>
-                    </View>
-
-                    <Chat.Bubble className="bg-gradient-to-r from-[#292929]/90 to-[#1a1a1a]/90 text-[#F0F0F0] shadow-xl max-w-lg border border-[#9DE82B]/20 backdrop-blur-sm">
-                      <Markdown
-                        content={message?.content ?? ""}
-                        className="text-[#F0F0F0] leading-relaxed"
-                      />
-                    </Chat.Bubble>
-                  </Chat.Start>
-                )}
-              </View>
-            ))}
-
-            {isLoading && (
-              <Chat.Start>
-                <View className="relative mr-3">
-                  <Chat.Image
-                    src={Robot}
-                    alt="Odin's Avatar"
-                    className="w-12 h-12 rounded-full border-2 border-[#9DE82B] shadow-lg bg-gradient-to-r from-[#9DE82B] to-[#7BC41F] p-1"
-                  />
-                  <View className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#9DE82B] rounded-full border-2 border-[#292929] animate-pulse"></View>
-                </View>
-
-                <Chat.Bubble className="bg-gradient-to-r from-[#292929]/90 to-[#1a1a1a]/90 text-[#F0F0F0] shadow-xl max-w-lg border border-[#9DE82B]/20 backdrop-blur-sm">
-                  <View className="flex items-center space-x-3 py-2">
-                    <Text className="text-[#F0F0F0]/90 text-sm font-medium">
-                      Pensando...
-                    </Text>
-                    <View className="flex space-x-1">
-                      <View className="w-2 h-2 bg-[#9DE82B] rounded-full animate-bounce"></View>
-                      <View
-                        className="w-2 h-2 bg-[#9DE82B] rounded-full animate-bounce"
-                        style={{ animationDelay: "0.1s" }}
-                      ></View>
-                      <View
-                        className="w-2 h-2 bg-[#9DE82B] rounded-full animate-bounce"
-                        style={{ animationDelay: "0.2s" }}
-                      ></View>
-                    </View>
-                  </View>
-                </Chat.Bubble>
-              </Chat.Start>
-            )}
-          </Chat>
-        </View>
-
-        {/* Input Area moderna */}
-        <View className="p-6 bg-gradient-to-r from-[#292929]/80 to-[#1a1a1a]/80 backdrop-blur-sm border-t border-[#9DE82B]/20">
-          <View className="flex items-center space-x-4 max-w-4xl mx-auto">
-            <View className="flex-1 relative">
-              <TextInput
-                className="w-full px-6 py-4 !bg-[#292929]/50 border border-[#9DE82B]/30 rounded-2xl text-[#F0F0F0] placeholder-[#F0F0F0]/50 focus:border-[#9DE82B] focus:ring-2 focus:ring-[#9DE82B]/20 backdrop-blur-sm transition-all duration-200 pr-12"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                onKeyUp={handleKeyPress}
-                placeholder="Digite sua mensagem para o Assistente de vendas..."
-                disabled={isLoading}
-              />
-            </View>
+            <TextInput
+              className="flex-1 bg-transparent border-none focus:outline-none text-gray-700 placeholder-gray-500"
+              value={value}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
+              onKeyUp={handleKeyPress}
+              placeholder="Ex: Look para inverno"
+              disabled={isLoading}
+            />
             <Button
-              onClick={() => askAgent(value)}
-              className={`px-8 py-4 rounded-2xl font-semibold transition-all duration-200 w-12 ${!value.trim() || isLoading
-                ? "bg-[#292929]/50 text-[#F0F0F0]/50 cursor-not-allowed"
-                : "bg-gradient-to-r from-[#9DE82B] to-[#7BC41F] text-[#292929] shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
-                }`}
-              disabled={!value.trim() || isLoading}
+              onClick={() => handleSearch(value)}
+              className="bg-black text-white rounded-full p-3 hover:bg-gray-800 transition-colors"
+              disabled={isLoading}
             >
-              {isLoading ? (
-                <View className="flex items-center space-x-2">
-                  <View className="w-4 h-4 border-2 border-[#292929]/30 border-t-[#292929] rounded-full animate-spin"></View>
-                  <Text>Enviando</Text>
-                </View>
-              ) : (
-                <View className="flex items-center">
-                  <Text className="!text-[#292929]" >Enviar</Text>
-                </View>
-              )}
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
             </Button>
           </View>
+        </View>
+
+        {/* Products Grid */}
+        <View className="flex-1 overflow-y-auto p-4 bg-white">
+          {isLoading ? (
+            <View className="flex items-center justify-center h-full">
+              <View className="flex flex-col items-center space-y-4">
+                <View className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></View>
+                <Text className="text-gray-600 font-medium">Buscando produtos...</Text>
+              </View>
+            </View>
+          ) : searchResults.length === 0 ? (
+            <View className="flex flex-col items-center justify-center h-full text-center space-y-4">
+              <Text className="text-2xl font-bold text-gray-800">
+                Busca Inteligente de Moda
+              </Text>
+              <Text className="text-gray-500 max-w-md">
+                Use a busca com IA para encontrar os produtos perfeitos. Experimente: "Look para inverno" ou "Roupa para festa"
+              </Text>
+            </View>
+          ) : (
+            <View className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+              {searchResults.map((item) => {
+                // Type guard to check if item is an InfoCard
+                const isInfoCard = (item: GridItem): item is InfoCard => {
+                  return 'type' in item && item.type === 'info';
+                };
+
+                // Type guard to check if item is a Product
+                const isProduct = (item: GridItem): item is Product => {
+                  return 'productId' in item;
+                };
+
+                if (isInfoCard(item)) {
+                  // Render InfoCard
+                  return (
+                    <View
+                      key={item.id}
+                      className={`rounded-2xl overflow-hidden shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer ${item.bgColor}`}
+                      onClick={() => item.searchQuery && handleInfoCardClick(item.searchQuery)}
+                    >
+                      <View className="aspect-[3/4] flex flex-col items-center justify-center p-6 text-center">
+                        <Text className="text-4xl mb-4">{item.icon}</Text>
+                        <Text className="text-purple-900 font-semibold text-lg leading-tight">
+                          {item.title}
+                        </Text>
+                        {item.subtitle && (
+                          <Text className="text-purple-700 font-bold text-xl mt-2">
+                            {item.subtitle}
+                          </Text>
+                        )}
+                        <View className="mt-4 px-3 py-1 bg-white/50 rounded-full">
+                          <Text className="text-xs text-purple-800 font-medium">
+                            Clique para buscar
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                } else if (isProduct(item)) {
+                  // Render Product
+                  return (
+                    <View
+                      key={item.productId}
+                      className="rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer bg-gray-50"
+                    >
+                      <View className="relative aspect-[3/4]">
+                        <Image
+                          src={item.images[0]?.imageUrl || ''}
+                          alt={item.productName}
+                          className="w-full h-full object-cover"
+                        />
+                      </View>
+                      <View className="p-4">
+                        <Text className="text-gray-900 font-semibold text-sm mb-1 line-clamp-2">
+                          {item.productName}
+                        </Text>
+                        <Text className="text-purple-600 font-bold text-lg">
+                          R$ {item.price.toFixed(2)}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                }
+
+                return null;
+              })}
+            </View>
+          )}
         </View>
       </View>
     </Page>

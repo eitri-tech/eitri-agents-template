@@ -5,7 +5,7 @@ module.exports = {
   "eitri-luminus": "2.5.0",
   "eitri-bifrost": "3.10.0",
   "eitri-commons": "2.1.2",
-  "eitri-agents": "1.5.0",
+  "eitri-agents": "1.8.0",
   version: "0.1.25",
   "public-key": "12869e02-4605-490b-8539-dc730d17281e",
   applicationId: "dc690c9d-aa0e-48c1-8fb2-f8e525529249",
@@ -14,6 +14,7 @@ module.exports = {
   organization: {},
   "eitri-app-dependencies": {
     "eitri-shopping-vtex-shared": { version: "1.3.4", isEitriAppShared: true },
+    "react-icons": { version: "5.5.0" }
   },
   type: "module",
   "check-js": false,
