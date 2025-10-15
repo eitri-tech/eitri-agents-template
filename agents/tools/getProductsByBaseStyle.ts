@@ -6,20 +6,22 @@ import {
 } from "../../src/types/Recommendation";
 
 const search = async (item: StyleSegmentationItem) => {
-  let category = `C:/${item.categoryId}`;
+  const facet = item.facet;
 
-  if (item.subcategoryId) {
-    category = `${category}/${item.subcategoryId}`;
-  }
+  console.log("Buscando produto pelo facet: ", facet);
 
-  const data = (await Vtex.catalog.searchProduct(item.searchQuery, {
+  // const data = (await Vtex.catalog.searchProduct(item.searchQuery, {
+  //   hideUnavailableItems: true,
+  //   fq: facet,
+  // })) as { products: Product[] };
+
+  const result = await Vtex.catalog.getProductsByFacets(facet, {
     hideUnavailableItems: true,
-    fq: category,
-  })) as { products: Product[] };
+  });
 
   return {
     name: item.name,
-    products: data.products.map((product) => ({
+    products: result.products.map((product) => ({
       productId: product.productId,
       productName: product.productName,
       imageUrl: product.items?.[0]?.images[0]?.imageUrl,

@@ -6,44 +6,50 @@ import {
   TextInput,
   Image,
 } from "eitri-luminus";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import HeaderComponent from "../components/HeaderComponent";
+import { Vtex } from 'eitri-shopping-vtex-shared'
 
 import { AgentRole, useAgent } from "eitri-agents";
+import { OptimizeProductResponse } from "../types/Product";
 
-export interface Product {
-  productId: string;
-  productName: string;
-  images: Array<{
-    imageUrl: string;
-  }>;
-  price: number;
-}
+type CategoryProducts = {
+  [category: string]: OptimizeProductResponse[];
+};
 
-interface InfoCard {
-  id: string;
-  type: "info";
-  title: string;
-  subtitle?: string;
-  icon: string;
-  bgColor: string;
-  searchQuery?: string; // Query to trigger when card is clicked
-}
+const ProductSkeleton = () => (
+  <View className="flex-shrink-0 w-40 rounded-2xl overflow-hidden shadow-md bg-gray-50 animate-pulse" style={{ display: 'flex', flexDirection: 'column' }}>
+    <View className="relative aspect-[3/4] bg-gray-200"></View>
+    <View className="p-3" style={{ display: 'flex', flexDirection: 'column' }}>
+      <View className="h-4 bg-gray-200 rounded mb-2"></View>
+      <View className="h-4 bg-gray-200 rounded w-2/3 mb-1"></View>
+      <View className="h-5 bg-gray-200 rounded w-1/2"></View>
+    </View>
+  </View>
+);
 
-type GridItem = Product | InfoCard;
+const CategorySkeleton = () => (
+  <View style={{ display: 'flex', flexDirection: 'column' }}>
+    <View className="h-7 bg-gray-200 rounded w-48 mb-4 px-2 animate-pulse"></View>
+    <View className="overflow-x-auto scrollbar-hide">
+      <View className="flex flex-row gap-4 pb-2">
+        {[1, 2, 3, 4].map((i) => (
+          <ProductSkeleton key={i} />
+        ))}
+      </View>
+    </View>
+  </View>
+);
 
 export default function ChatPage() {
   const [value, setValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [searchResults, setSearchResults] = useState<GridItem[]>([]);
+  const [searchResults, setSearchResults] = useState<CategoryProducts>({});
 
-  const agent = useAgent("SellerAgent", {
+  const agent = useAgent("Fashion", {
     verbose: true,
-    // llm: 'openai',
-    // model: 'gpt-5',
-    llm: 'gemini',
-    model: 'gemini-2.5-flash'
   });
+
 
   const handleSearch = async (query: string) => {
     if (!query.trim()) {
@@ -56,30 +62,31 @@ export default function ChatPage() {
     try {
       const response = await agent.call({
         role: AgentRole.User,
-        content: `${query}`,
+        content: query,
       }, {
-        skipSentToolResultToAgent: true
+        skipSentToolResultToAgent: 'getProductsByBaseStyle'
       });
 
-      if (!response.rawToolResult) {
-        console.warn('No raw tool result found')
-        return
+      const jsonData = response.rawToolResult as Record<string, OptimizeProductResponse[]>
+
+      if (Object.keys(jsonData).length === 0) {
+        console.warn(jsonData);
+        setSearchResults({});
+        return;
       }
 
-      console.log(response.rawToolResult)
+      // Filter out empty categories
+      const filteredProducts: CategoryProducts = {};
+      Object.entries(jsonData).forEach(([category, products]) => {
+        if (Array.isArray(products) && products.length > 0) {
+          filteredProducts[category] = products;
+        }
+      });
 
-      const data = response.rawToolResult
-
-      // Parse the products from the agent response
-      if (Array.isArray(data)) {
-        const products = data.filter((item): item is Product => 'productId' in item);
-        const mergedResults = mergeInfoCards(products);
-        setSearchResults(mergedResults);
-      } else {
-        setSearchResults([]);
-      }
+      setSearchResults(filteredProducts);
     } catch (error) {
       console.error("Error searching:", error);
+      setSearchResults({});
     } finally {
       setIsLoading(false);
     }
@@ -91,79 +98,6 @@ export default function ChatPage() {
     }
   };
 
-  const handleInfoCardClick = (searchQuery: string) => {
-    setValue(searchQuery);
-    handleSearch(searchQuery);
-  };
-
-  const mergeInfoCards = (products: Product[]): GridItem[] => {
-    const suggestions: InfoCard[] = [
-      {
-        id: "info-1",
-        type: "info",
-        title: "Presentes a partir de",
-        subtitle: "R$ 39,99",
-        icon: "✨",
-        bgColor: "bg-purple-100",
-        searchQuery: "Presentes até 50 reais"
-      },
-      {
-        id: "info-2",
-        type: "info",
-        title: "Listras: a queridinha da estação",
-        icon: "✓",
-        bgColor: "bg-purple-100",
-        searchQuery: "Roupas com listras"
-      },
-      {
-        id: "info-3",
-        type: "info",
-        title: "Chegou agora as tendências de verão",
-        icon: "🌺",
-        bgColor: "bg-purple-100",
-        searchQuery: "Tendências verão"
-      },
-      {
-        id: "info-4",
-        type: "info",
-        title: "Looks para o trabalho",
-        icon: "💼",
-        bgColor: "bg-blue-100",
-        searchQuery: "Roupas profissionais"
-      },
-      {
-        id: "info-5",
-        type: "info",
-        title: "Esportivo e casual",
-        icon: "👟",
-        bgColor: "bg-green-100",
-        searchQuery: "Roupas esportivas"
-      }
-    ];
-
-    // Intelligently merge info cards with products
-    const result: GridItem[] = [];
-    const infoCardInterval = Math.max(3, Math.floor(products.length / suggestions.length));
-
-    let infoCardIndex = 0;
-    products.forEach((product, index) => {
-      result.push(product);
-
-      // Insert an info card after every few products
-      if ((index + 1) % infoCardInterval === 0 && infoCardIndex < suggestions.length) {
-        result.push(suggestions[infoCardIndex]);
-        infoCardIndex++;
-      }
-    });
-
-    // Add remaining info cards if there's space
-    while (infoCardIndex < suggestions.length && result.length < 12) {
-      result.push(suggestions[infoCardIndex]);
-      infoCardIndex++;
-    }
-
-    return result;
-  };
 
   return (
     <Page
@@ -204,88 +138,77 @@ export default function ChatPage() {
         {/* Products Grid */}
         <View className="flex-1 overflow-y-auto p-4 bg-white">
           {isLoading ? (
-            <View className="flex items-center justify-center h-full">
-              <View className="flex flex-col items-center space-y-4">
-                <View className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></View>
-                <Text className="text-gray-600 font-medium">Buscando produtos...</Text>
+            <View style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              {[1, 2, 3].map((i) => (
+                <CategorySkeleton key={i} />
+              ))}
+            </View>
+          ) : Object.keys(searchResults).length === 0 ? (
+            <View className="h-full items-center justify-center" style={{ display: 'flex', flexDirection: 'column' }}>
+              <View className="text-center max-w-2xl px-6" style={{ display: 'flex', flexDirection: 'column' }}>
+                <View className="mb-6" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <Text className="text-3xl font-bold text-gray-900 mb-4">
+                    Busca Inteligente por IA
+                  </Text>
+                  <Text className="text-lg text-gray-600 leading-relaxed">
+                    Use nossa inteligência artificial para encontrar produtos perfeitos para você.
+                    Descreva o que procura com suas próprias palavras e deixe a IA fazer o resto.
+                  </Text>
+                </View>
+                <View className="mt-4 p-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <Text className="text-sm text-gray-700 mb-3 font-semibold">
+                    Exemplos de buscas:
+                  </Text>
+                  <View className="space-y-2 text-left" style={{ display: 'flex', flexDirection: 'column' }}>
+                    <Text className="text-sm text-gray-600">Look casual para o fim de semana</Text>
+                    <Text className="text-sm text-gray-600">Roupa elegante para jantar</Text>
+                    <Text className="text-sm text-gray-600">Conjunto esportivo confortável</Text>
+                  </View>
+                </View>
               </View>
             </View>
-          ) : searchResults.length === 0 ? (
-            <View className="flex flex-col items-center justify-center h-full text-center space-y-4">
-              <Text className="text-2xl font-bold text-gray-800">
-                Busca Inteligente de Moda
-              </Text>
-              <Text className="text-gray-500 max-w-md">
-                Use a busca com IA para encontrar os produtos perfeitos. Experimente: "Look para inverno" ou "Roupa para festa"
-              </Text>
-            </View>
           ) : (
-            <View className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {searchResults.map((item) => {
-                // Type guard to check if item is an InfoCard
-                const isInfoCard = (item: GridItem): item is InfoCard => {
-                  return 'type' in item && item.type === 'info';
-                };
+            <View className="space-y-8" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              {Object.entries(searchResults).map(([category, products]) => (
+                <View key={category} style={{ display: 'flex', flexDirection: 'column' }}>
+                  {/* Category Title */}
+                  <Text className="text-xl font-bold text-gray-900 mb-4 px-2">
+                    {category}
+                  </Text>
 
-                // Type guard to check if item is a Product
-                const isProduct = (item: GridItem): item is Product => {
-                  return 'productId' in item;
-                };
-
-                if (isInfoCard(item)) {
-                  // Render InfoCard
-                  return (
-                    <View
-                      key={item.id}
-                      className={`rounded-2xl overflow-hidden shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer ${item.bgColor}`}
-                      onClick={() => item.searchQuery && handleInfoCardClick(item.searchQuery)}
-                    >
-                      <View className="aspect-[3/4] flex flex-col items-center justify-center p-6 text-center">
-                        <Text className="text-4xl mb-4">{item.icon}</Text>
-                        <Text className="text-purple-900 font-semibold text-lg leading-tight">
-                          {item.title}
-                        </Text>
-                        {item.subtitle && (
-                          <Text className="text-purple-700 font-bold text-xl mt-2">
-                            {item.subtitle}
-                          </Text>
-                        )}
-                        <View className="mt-4 px-3 py-1 bg-white/50 rounded-full">
-                          <Text className="text-xs text-purple-800 font-medium">
-                            Clique para buscar
-                          </Text>
+                  {/* Horizontal Scrollable Product List */}
+                  <View className="overflow-x-auto scrollbar-hide">
+                    <View className="flex flex-row gap-4 pb-2">
+                      {products.map((product) => (
+                        <View
+                          key={product.productId}
+                          className="flex-shrink-0 w-40 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer bg-gray-50"
+                          style={{ display: 'flex', flexDirection: 'column' }}
+                        >
+                          <View className="relative aspect-[3/4]">
+                            <Image
+                              src={product.imageUrl}
+                              alt={product.productName}
+                              className="w-full h-full object-cover"
+                            />
+                          </View>
+                          <View className="p-3" style={{ display: 'flex', flexDirection: 'column' }}>
+                            <Text className="text-gray-900 font-semibold text-sm mb-1 line-clamp-2">
+                              {product.productName}
+                            </Text>
+                            <Text className="text-purple-600 font-bold text-base">
+                              {product.price.toLocaleString("pt-BR", {
+                                style: "currency",
+                                currency: "BRL",
+                              })}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
+                      ))}
                     </View>
-                  );
-                } else if (isProduct(item)) {
-                  // Render Product
-                  return (
-                    <View
-                      key={item.productId}
-                      className="rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer bg-gray-50"
-                    >
-                      <View className="relative aspect-[3/4]">
-                        <Image
-                          src={item.images[0]?.imageUrl || ''}
-                          alt={item.productName}
-                          className="w-full h-full object-cover"
-                        />
-                      </View>
-                      <View className="p-4">
-                        <Text className="text-gray-900 font-semibold text-sm mb-1 line-clamp-2">
-                          {item.productName}
-                        </Text>
-                        <Text className="text-purple-600 font-bold text-lg">
-                          R$ {item.price.toFixed(2)}
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                }
-
-                return null;
-              })}
+                  </View>
+                </View>
+              ))}
             </View>
           )}
         </View>

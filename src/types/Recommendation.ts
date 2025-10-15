@@ -25,4 +25,5 @@ export interface StyleSegmentationItem {
   searchQuery: string;
   categoryId: string;
   subcategoryId: string;
+  facet?: string;
 }
