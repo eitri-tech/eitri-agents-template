@@ -41,13 +41,15 @@ const CategorySkeleton = () => (
   </View>
 );
 
-export default function ChatPage() {
+export default function SearchPage() {
   const [value, setValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<CategoryProducts>({});
 
   const agent = useAgent("Fashion", {
     verbose: true,
+    // llm: 'openai',
+    // model: 'gpt-5-mini'
   });
 
 

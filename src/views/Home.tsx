@@ -8,7 +8,7 @@ import {
   Markdown,
 } from "eitri-luminus";
 import Eitri from "eitri-bifrost";
-import {  } from 'react-icons/fa'
+import { } from 'react-icons/fa'
 
 export default function Home(props) {
   return (
@@ -21,11 +21,11 @@ export default function Home(props) {
           className="w-full"
           onClick={async () =>
             await Eitri.navigation.navigate({
-              path: "/Chat",
+              path: "/Search",
             })
           }
         >
-          Navegar para Chat
+          Navegar para Search
         </Button>
         <Button
           className="mt-4 w-full"

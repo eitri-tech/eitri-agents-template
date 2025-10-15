@@ -14,20 +14,30 @@ const search = async (item: StyleSegmentationItem) => {
 
   if (!result.facets) return [];
 
-  const facets = [];
+  // const facets = [];
 
-  result.facets.forEach((facet) =>
-    facet.values.forEach((item) => {
-      facets.push({
-        id: item.id,
-        name: item.name,
-        key: item.key,
-        value: item.value,
-      });
-    })
-  );
+  // result.facets.forEach((facet) =>
+  //   facet.values.forEach((item) => {
+  //     facets.push({
+  //       id: item.id,
+  //       name: item.name,
+  //       key: item.key,
+  //       value: item.value,
+  //     });
+  //   })
+  // );
 
-  return facets;
+  // return facets;
+  return result.facets.map((facet) => ({
+    key: facet.key,
+    name: facet.name,
+    values: facet.values.map((value) => ({
+      id: value.id,
+      name: value.name,
+      key: value.key,
+      value: value.value,
+    })),
+  }));
 };
 
 export default async function getCategories(
