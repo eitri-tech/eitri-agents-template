@@ -1,14 +1,7 @@
-import {
-  Text,
-  View,
-  Button,
-  Page,
-  TextInput,
-  Image,
-} from "eitri-luminus";
+import { Text, View, Button, Page, TextInput, Image } from "eitri-luminus";
 import { useEffect, useState } from "react";
-import HeaderComponent from "../components/HeaderComponent";
-import { Vtex } from 'eitri-shopping-vtex-shared'
+import { HiMicrophone, HiStop, HiCamera } from "react-icons/hi";
+import { Vtex } from "eitri-shopping-vtex-shared";
 import Eitri from "eitri-bifrost";
 
 import { AgentRole, useAgent } from "eitri-agents";
@@ -20,9 +13,12 @@ type CategoryProducts = {
 };
 
 const ProductSkeleton = () => (
-  <View className="flex-shrink-0 w-40 rounded-2xl overflow-hidden shadow-md bg-gray-50 animate-pulse" style={{ display: 'flex', flexDirection: 'column' }}>
+  <View
+    className="flex-shrink-0 w-40 rounded-2xl overflow-hidden shadow-md bg-gray-50 animate-pulse"
+    style={{ display: "flex", flexDirection: "column" }}
+  >
     <View className="relative aspect-[3/4] bg-gray-200"></View>
-    <View className="p-3" style={{ display: 'flex', flexDirection: 'column' }}>
+    <View className="p-3" style={{ display: "flex", flexDirection: "column" }}>
       <View className="h-4 bg-gray-200 rounded mb-2"></View>
       <View className="h-4 bg-gray-200 rounded w-2/3 mb-1"></View>
       <View className="h-5 bg-gray-200 rounded w-1/2"></View>
@@ -31,7 +27,7 @@ const ProductSkeleton = () => (
 );
 
 const CategorySkeleton = () => (
-  <View style={{ display: 'flex', flexDirection: 'column' }}>
+  <View style={{ display: "flex", flexDirection: "column" }}>
     <View className="h-7 bg-gray-200 rounded w-48 mb-4 px-2 animate-pulse"></View>
     <View className="overflow-x-auto scrollbar-hide">
       <View className="flex flex-row gap-4 pb-2">
@@ -47,15 +43,18 @@ export default function SearchPage() {
   const [value, setValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<CategoryProducts>({});
-  const [image, setImage] = useState<{ data: string; mimeType: string } | null>(null);
+  const [image, setImage] = useState<{ data: string; mimeType: string } | null>(
+    null
+  );
+  const [isListening, setIsListening] = useState(false);
 
   const agent = useAgent("Fashion", {
     verbose: true,
-    knowledgeBasePrompt: 'Use as categorias abaixo para melhorar a inferência para busca dos Facets para ter uma precisão maior na busca de produtos. Use apenas as categorias abaixo.',
+    knowledgeBasePrompt:
+      "Use as categorias abaixo para melhorar a inferência para busca dos Facets para ter uma precisão maior na busca de produtos. Use apenas as categorias abaixo.",
     // llm: 'openai',
     // model: 'gpt-5'
   });
-
 
   const setKnowledge = async () => {
     setIsLoading(true);
@@ -69,19 +68,18 @@ export default function SearchPage() {
       children: category.children.map((child) => ({
         id: child.id,
         name: child.name,
-      }))
-    }))
+      })),
+    }));
 
     const data = preparedCategories.map((category) => ({
       id: String(category.id),
-      content: JSON.stringify(category)
-    }))
+      content: JSON.stringify(category),
+    }));
 
-    await agent.initializeKnowledgeBase(data)
-
+    await agent.initializeKnowledgeBase(data);
 
     setIsLoading(false);
-  }
+  };
 
   useEffect(() => {
     setKnowledge();
@@ -107,22 +105,31 @@ export default function SearchPage() {
     }
   };
 
-  const handleSearchWithImage = async (imageData: { data: string; mimeType: string }) => {
+  const handleSearchWithImage = async (imageData: {
+    data: string;
+    mimeType: string;
+  }) => {
     setIsLoading(true);
     setValue(""); // Clear text input when using image
 
     try {
-      const response = await agent.call({
-        content: "Forneça uma recomendação de estilo. Foque somente nas roupas e acessórios.",
-        role: AgentRole.User,
-        file: {
-          mimeType: imageData.mimeType,
-          data: imageData.data,
+      const response = await agent.call(
+        {
+          content:
+            "Forneça uma recomendação de estilo. Foque somente nas roupas e acessórios.",
+          role: AgentRole.User,
+          file: {
+            mimeType: imageData.mimeType,
+            data: imageData.data,
+          },
         },
-      }, { skipSentToolResultToAgent: 'getProductsByBaseStyle' });
+        { skipSentToolResultToAgent: "getProductsByBaseStyle" }
+      );
 
-      const jsonData = response.rawToolResult as Record<string, OptimizeProductResponse[]>
-
+      const jsonData = response.rawToolResult as Record<
+        string,
+        OptimizeProductResponse[]
+      >;
 
       if (!jsonData || Object.keys(jsonData).length === 0) {
         console.warn(jsonData);
@@ -157,14 +164,20 @@ export default function SearchPage() {
     setImage(null); // Clear image when using text search
 
     try {
-      const response = await agent.call({
-        role: AgentRole.User,
-        content: query,
-      }, {
-        skipSentToolResultToAgent: 'getProductsByBaseStyle'
-      });
+      const response = await agent.call(
+        {
+          role: AgentRole.User,
+          content: query,
+        },
+        {
+          skipSentToolResultToAgent: "getProductsByBaseStyle",
+        }
+      );
 
-      const jsonData = response.rawToolResult as Record<string, OptimizeProductResponse[]>
+      const jsonData = response.rawToolResult as Record<
+        string,
+        OptimizeProductResponse[]
+      >;
 
       if (Object.keys(jsonData).length === 0) {
         console.warn(jsonData);
@@ -195,6 +208,29 @@ export default function SearchPage() {
     }
   };
 
+  const handleVoiceSearch = async () => {
+    try {
+      setIsListening(true);
+      setImage(null); // Clear image when using voice
+
+      const result = await Eitri.exposedApis.speech.recognizeOnce({
+        language: "pt-BR",
+      });
+      setIsListening(false);
+
+      if (!result) {
+        console.warn("Nenhuma mensagem recebida");
+        return;
+      }
+
+      // Set the value in the input and trigger search immediately
+      setValue(result);
+      await handleSearch(result);
+    } catch (error) {
+      console.error("Erro ao capturar áudio:", error);
+      setIsListening(false);
+    }
+  };
 
   return (
     <Page
@@ -202,65 +238,92 @@ export default function SearchPage() {
       statusBarTextColor="black"
     >
       <View className="w-full max-w-6xl mx-auto flex flex-col h-full pt-12">
-
         {/* Search Bar with Camera Icon */}
         <View className="p-4 bg-white border-b border-gray-200">
-          <View className="flex items-center gap-3 bg-gray-100 rounded-full px-2 py-2" style={{ display: 'flex', alignItems: 'center' }}>
+          <View
+            className="flex items-center gap-3 bg-gray-100 rounded-full px-2 py-2"
+            style={{ display: "flex", alignItems: "center" }}
+          >
             <Button
               onClick={handleImagePick}
-              className="p-2 bg-transparent hover:bg-gray-200 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`p-2 bg-transparent hover:bg-gray-200 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${image ? "text-primary" : "text-gray-400"
+                }`}
               disabled={isLoading}
               style={{
-                minWidth: 'auto',
-                border: 'none',
-                color: image ? '#9333ea' : '#9ca3af'
+                minWidth: "auto",
+                border: "none",
               }}
             >
-              <svg className="w-5 h-5" fill={image ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+              <HiCamera className="w-5 h-5 text-gray-400" />
             </Button>
             <TextInput
               className="flex-1 bg-transparent border-none focus:outline-none text-gray-700 placeholder-gray-500"
-              style={{ outline: 'none', border: 'none' }}
+              style={{ outline: "none", border: "none" }}
               value={value}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setValue(e.target.value)
+              }
               onKeyUp={handleKeyPress}
-              placeholder={image ? "Busca por imagem ativa" : "Ex: Look para inverno"}
+              placeholder={
+                image ? "Busca por imagem ativa" : "Ex: Look para inverno"
+              }
               disabled={isLoading}
             />
             <Button
               onClick={() => handleSearch(value)}
               className="bg-black text-white rounded-full p-2 hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading}
-              style={{ minWidth: 'auto', border: 'none' }}
+              style={{ minWidth: "auto", border: "none" }}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M14 5l7 7m0 0l-7 7m7-7H3"
+                />
               </svg>
             </Button>
           </View>
           {image && (
-            <View className="mt-3 flex items-center gap-2 bg-purple-50 p-2 rounded-lg" style={{ display: 'flex', alignItems: 'center' }}>
-              <View className="relative w-12 h-12 rounded-lg overflow-hidden border-2 border-purple-600 flex-shrink-0">
+            <View
+              className="mt-3 flex items-center gap-2 bg-primary/10 p-2 rounded-lg"
+              style={{ display: "flex", alignItems: "center" }}
+            >
+              <View className="relative w-12 h-12 rounded-lg overflow-hidden border-2 border-primary flex-shrink-0">
                 <Image
                   src={`data:${image.mimeType};base64,${image.data}`}
                   className="w-full h-full object-cover"
                 />
               </View>
-              <Text className="text-sm text-gray-700 flex-1">Imagem selecionada</Text>
+              <Text className="text-sm text-gray-700 flex-1">
+                Imagem selecionada
+              </Text>
               <Button
                 onClick={() => setImage(null)}
-                className="p-1.5 bg-transparent hover:bg-red-100 rounded-full transition-colors"
+                className="p-1.5 bg-transparent hover:bg-red-100 rounded-full transition-colors text-red-500"
                 style={{
-                  minWidth: 'auto',
-                  border: 'none',
-                  color: '#ef4444'
+                  minWidth: "auto",
+                  border: "none",
                 }}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </Button>
             </View>
@@ -270,39 +333,69 @@ export default function SearchPage() {
         {/* Products Grid */}
         <View className="flex-1 overflow-y-auto p-4 bg-white">
           {isLoading ? (
-            <View style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <View
+              style={{ display: "flex", flexDirection: "column", gap: "2rem" }}
+            >
               {[1, 2, 3].map((i) => (
                 <CategorySkeleton key={i} />
               ))}
             </View>
           ) : Object.keys(searchResults).length === 0 ? (
-            <View className="h-full items-center justify-center" style={{ display: 'flex', flexDirection: 'column' }}>
-              <View className="text-center max-w-2xl px-6" style={{ display: 'flex', flexDirection: 'column' }}>
-                <View className="mb-6" style={{ display: 'flex', flexDirection: 'column' }}>
+            <View
+              className="h-full items-center justify-center"
+              style={{ display: "flex", flexDirection: "column" }}
+            >
+              <View
+                className="text-center max-w-2xl px-6"
+                style={{ display: "flex", flexDirection: "column" }}
+              >
+                <View
+                  className="mb-6"
+                  style={{ display: "flex", flexDirection: "column" }}
+                >
                   <Text className="text-3xl font-bold text-gray-900 mb-4">
                     Busca Inteligente por IA
                   </Text>
                   <Text className="text-lg text-gray-600 leading-relaxed">
-                    Use nossa inteligência artificial para encontrar produtos perfeitos para você.
-                    Descreva o que procura com suas próprias palavras e deixe a IA fazer o resto.
+                    Use nossa inteligência artificial para encontrar produtos
+                    perfeitos para você. Descreva o que procura com suas
+                    próprias palavras e deixe a IA fazer o resto.
                   </Text>
                 </View>
-                <View className="mt-4 p-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-2xl" style={{ display: 'flex', flexDirection: 'column' }}>
+                <View
+                  className="mt-4 p-6 bg-primary/5 rounded-2xl"
+                  style={{ display: "flex", flexDirection: "column" }}
+                >
                   <Text className="text-sm text-gray-700 mb-3 font-semibold">
                     Exemplos de buscas:
                   </Text>
-                  <View className="space-y-2 text-left" style={{ display: 'flex', flexDirection: 'column' }}>
-                    <Text className="text-sm text-gray-600">Look casual para o fim de semana</Text>
-                    <Text className="text-sm text-gray-600">Roupa elegante para jantar</Text>
-                    <Text className="text-sm text-gray-600">Conjunto esportivo confortável</Text>
+                  <View
+                    className="space-y-2 text-left"
+                    style={{ display: "flex", flexDirection: "column" }}
+                  >
+                    <Text className="text-sm text-gray-600">
+                      Look casual para o fim de semana
+                    </Text>
+                    <Text className="text-sm text-gray-600">
+                      Roupa elegante para jantar
+                    </Text>
+                    <Text className="text-sm text-gray-600">
+                      Conjunto esportivo confortável
+                    </Text>
                   </View>
                 </View>
               </View>
             </View>
           ) : (
-            <View className="space-y-8" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <View
+              className="space-y-8"
+              style={{ display: "flex", flexDirection: "column", gap: "2rem" }}
+            >
               {Object.entries(searchResults).map(([category, products]) => (
-                <View key={category} style={{ display: 'flex', flexDirection: 'column' }}>
+                <View
+                  key={category}
+                  style={{ display: "flex", flexDirection: "column" }}
+                >
                   {/* Category Title */}
                   <Text className="text-xl font-bold text-gray-900 mb-4 px-2">
                     {category}
@@ -315,7 +408,7 @@ export default function SearchPage() {
                         <View
                           key={product.productId}
                           className="flex-shrink-0 w-40 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer bg-gray-50"
-                          style={{ display: 'flex', flexDirection: 'column' }}
+                          style={{ display: "flex", flexDirection: "column" }}
                         >
                           <View className="relative aspect-[3/4]">
                             <Image
@@ -324,11 +417,14 @@ export default function SearchPage() {
                               className="w-full h-full object-cover"
                             />
                           </View>
-                          <View className="p-3" style={{ display: 'flex', flexDirection: 'column' }}>
+                          <View
+                            className="p-3"
+                            style={{ display: "flex", flexDirection: "column" }}
+                          >
                             <Text className="text-gray-900 font-semibold text-sm mb-1 line-clamp-2">
                               {product.productName}
                             </Text>
-                            <Text className="text-purple-600 font-bold text-base">
+                            <Text className="text-primary font-bold text-base">
                               {product.price.toLocaleString("pt-BR", {
                                 style: "currency",
                                 currency: "BRL",
@@ -342,6 +438,33 @@ export default function SearchPage() {
                 </View>
               ))}
             </View>
+          )}
+        </View>
+
+        {/* Floating Voice Button */}
+        <View className="fixed bottom-8 right-8 z-50">
+          <Button
+            onClick={handleVoiceSearch}
+            disabled={isLoading || isListening}
+            className={`rounded-full shadow-2xl transition-all duration-300 border-0 ${isListening
+                ? "w-16 h-16 bg-red-500 hover:bg-red-600 shadow-[0_0_40px_rgba(239,68,68,0.6)] animate-pulse"
+                : "w-14 h-14 bg-primary hover:bg-primary/90 hover:scale-110 shadow-primary/50 shadow-lg"
+              }`}
+            style={{
+              minWidth: "auto",
+              border: "none",
+            }}
+          >
+            {isListening ? (
+              <HiStop className="w-8 h-8 text-white drop-shadow-lg" />
+            ) : (
+              <HiMicrophone className="w-7 h-7 text-white drop-shadow-lg" />
+            )}
+          </Button>
+          {isListening && (
+            <Text className="absolute -top-8 left-1/2 transform -translate-x-1/2 text-xs text-gray-700 bg-white px-3 py-1 rounded-full shadow-lg whitespace-nowrap">
+              Escutando...
+            </Text>
           )}
         </View>
       </View>
