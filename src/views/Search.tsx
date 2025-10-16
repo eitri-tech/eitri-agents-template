@@ -39,6 +39,136 @@ const CategorySkeleton = () => (
   </View>
 );
 
+const AILoadingComponent = ({ status }: { status: any }) => {
+  const [pulseScale, setPulseScale] = useState(1);
+  const [dotStates, setDotStates] = useState([0, 0, 0]);
+
+  useEffect(() => {
+    // Pulse animation
+    const pulseInterval = setInterval(() => {
+      setPulseScale((prev) => (prev === 1 ? 1.1 : 1));
+    }, 1000);
+
+    // Dots bounce animation
+    const dotInterval = setInterval(() => {
+      setDotStates((prev) => {
+        const newStates = [...prev];
+        const time = Date.now() % 1400;
+        newStates[0] = time < 560 ? Math.sin((time / 560) * Math.PI) : 0;
+        newStates[1] = time >= 160 && time < 720 ? Math.sin(((time - 160) / 560) * Math.PI) : 0;
+        newStates[2] = time >= 320 && time < 880 ? Math.sin(((time - 320) / 560) * Math.PI) : 0;
+        return newStates;
+      });
+    }, 50);
+
+    return () => {
+      clearInterval(pulseInterval);
+      clearInterval(dotInterval);
+    };
+  }, []);
+
+  const getStatusMessage = () => {
+    if (!status) return "Preparando sua busca...";
+
+    switch (status.type) {
+      case "generating_embedding":
+        return "Analisando sua solicitação...";
+      case "calling_ai":
+        return "Consultando nossa inteligência artificial...";
+      case "executing_tool":
+        return status.toolName === "getProductsByBaseStyle"
+          ? "Buscando os melhores produtos para você..."
+          : "Processando informações...";
+      case "idle":
+      default:
+        return "Preparando sua busca...";
+    }
+  };
+
+  return (
+    <View
+      className="flex items-center justify-center py-16"
+      style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
+    >
+      {/* AI Animation Effect */}
+      <View style={{ position: "relative", width: "80px", height: "80px" }}>
+        {/* Outer pulsing circle */}
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "80px",
+            height: "80px",
+            borderRadius: "50%",
+            backgroundColor: "rgba(102, 126, 234, 0.2)",
+            transform: `scale(${pulseScale})`,
+            transition: "transform 1s cubic-bezier(0.4, 0, 0.6, 1)",
+          }}
+        ></View>
+
+        {/* Center gradient orb */}
+        <View
+          style={{
+            position: "relative",
+            width: "80px",
+            height: "80px",
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            boxShadow: "0 8px 32px rgba(102, 126, 234, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {/* Inner animated dots */}
+          <View
+            style={{ display: "flex", gap: "0.375rem", alignItems: "center" }}
+          >
+            {dotStates.map((scale, i) => (
+              <View
+                key={i}
+                style={{
+                  width: "8px",
+                  height: "8px",
+                  backgroundColor: "white",
+                  borderRadius: "50%",
+                  transform: `scale(${0.5 + scale * 0.5})`,
+                  opacity: 0.5 + scale * 0.5,
+                  transition: "all 0.05s ease-in-out",
+                }}
+              ></View>
+            ))}
+          </View>
+        </View>
+      </View>
+
+      {/* Status Message */}
+      <View
+        className="text-center max-w-md px-4"
+        style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
+      >
+        <Text className="text-lg font-semibold text-gray-800">
+          {getStatusMessage()}
+        </Text>
+        <Text className="text-sm text-gray-500">
+          Aguarde alguns instantes
+        </Text>
+      </View>
+
+      {/* Loading skeleton preview */}
+      <View
+        className="w-full mt-8"
+        style={{ display: "flex", flexDirection: "column", gap: "2rem" }}
+      >
+        {[1, 2].map((i) => (
+          <CategorySkeleton key={i} />
+        ))}
+      </View>
+    </View>
+  );
+};
+
 export default function SearchPage() {
   const [value, setValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -333,13 +463,7 @@ export default function SearchPage() {
         {/* Products Grid */}
         <View className="flex-1 overflow-y-auto p-4 bg-white">
           {isLoading ? (
-            <View
-              style={{ display: "flex", flexDirection: "column", gap: "2rem" }}
-            >
-              {[1, 2, 3].map((i) => (
-                <CategorySkeleton key={i} />
-              ))}
-            </View>
+            <AILoadingComponent status={agent.status} />
           ) : Object.keys(searchResults).length === 0 ? (
             <View
               className="h-full items-center justify-center"
