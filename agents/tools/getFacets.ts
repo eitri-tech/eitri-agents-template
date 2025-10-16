@@ -1,5 +1,4 @@
 import { Vtex } from "eitri-shopping-vtex-shared";
-import { Category } from "../../src/types/Category";
 import {
   StyleSegmentation,
   StyleSegmentationItem,
@@ -10,6 +9,8 @@ const search = async (item: StyleSegmentationItem) => {
   const result = (await Vtex.searchGraphql.facets({
     hideUnavailableItems: true,
     fullText: item.categoryName + " " + item.subcategoryName,
+    removeHiddenFacets: true,
+    // operator: "or",
   } as never)) as FacetsResponse;
 
   if (!result.facets) return [];

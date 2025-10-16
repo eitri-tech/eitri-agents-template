@@ -9,6 +9,7 @@ import {
 import { useEffect, useState } from "react";
 import HeaderComponent from "../components/HeaderComponent";
 import { Vtex } from 'eitri-shopping-vtex-shared'
+import Eitri from "eitri-bifrost";
 
 import { AgentRole, useAgent } from "eitri-agents";
 import { OptimizeProductResponse } from "../types/Product";
@@ -46,6 +47,7 @@ export default function SearchPage() {
   const [value, setValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<CategoryProducts>({});
+  const [image, setImage] = useState<{ data: string; mimeType: string } | null>(null);
 
   const agent = useAgent("Fashion", {
     verbose: true,
@@ -85,6 +87,66 @@ export default function SearchPage() {
     setKnowledge();
   }, []);
 
+  const handleImagePick = async () => {
+    try {
+      const files = await Eitri.fs.openFilePicker({
+        fileExtension: ["jpg", "jpeg", "png"],
+      });
+
+      if (files && files.length > 0) {
+        const selectedImage = {
+          data: await files[0].toBase64(),
+          mimeType: files[0].mimeType,
+        };
+        setImage(selectedImage);
+        // Automatically search with the image
+        handleSearchWithImage(selectedImage);
+      }
+    } catch (error) {
+      console.error("Image pick failed:", error);
+    }
+  };
+
+  const handleSearchWithImage = async (imageData: { data: string; mimeType: string }) => {
+    setIsLoading(true);
+    setValue(""); // Clear text input when using image
+
+    try {
+      const response = await agent.call({
+        content: "Forneça uma recomendação de estilo. Foque somente nas roupas e acessórios.",
+        role: AgentRole.User,
+        file: {
+          mimeType: imageData.mimeType,
+          data: imageData.data,
+        },
+      }, { skipSentToolResultToAgent: 'getProductsByBaseStyle' });
+
+      const jsonData = response.rawToolResult as Record<string, OptimizeProductResponse[]>
+
+
+      if (!jsonData || Object.keys(jsonData).length === 0) {
+        console.warn(jsonData);
+        setSearchResults({});
+        return;
+      }
+
+      // Filter out empty categories
+      const filteredProducts: CategoryProducts = {};
+      Object.entries(jsonData).forEach(([category, products]) => {
+        if (Array.isArray(products) && products.length > 0) {
+          filteredProducts[category] = products;
+        }
+      });
+
+      setSearchResults(filteredProducts);
+    } catch (error) {
+      console.error("Error searching with image:", error);
+      setSearchResults({});
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSearch = async (query: string) => {
     if (!query.trim()) {
       return;
@@ -92,6 +154,7 @@ export default function SearchPage() {
 
     setIsLoading(true);
     setValue(query);
+    setImage(null); // Clear image when using text search
 
     try {
       const response = await agent.call({
@@ -142,31 +205,66 @@ export default function SearchPage() {
 
         {/* Search Bar with Camera Icon */}
         <View className="p-4 bg-white border-b border-gray-200">
-          <View className="flex items-center space-x-3 bg-gray-100 rounded-full px-4 py-3">
-            <View className="text-gray-400">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <View className="flex items-center gap-3 bg-gray-100 rounded-full px-2 py-2" style={{ display: 'flex', alignItems: 'center' }}>
+            <Button
+              onClick={handleImagePick}
+              className="p-2 bg-transparent hover:bg-gray-200 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading}
+              style={{
+                minWidth: 'auto',
+                border: 'none',
+                color: image ? '#9333ea' : '#9ca3af'
+              }}
+            >
+              <svg className="w-5 h-5" fill={image ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-            </View>
+            </Button>
             <TextInput
               className="flex-1 bg-transparent border-none focus:outline-none text-gray-700 placeholder-gray-500"
+              style={{ outline: 'none', border: 'none' }}
               value={value}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
               onKeyUp={handleKeyPress}
-              placeholder="Ex: Look para inverno"
+              placeholder={image ? "Busca por imagem ativa" : "Ex: Look para inverno"}
               disabled={isLoading}
             />
             <Button
               onClick={() => handleSearch(value)}
-              className="bg-black text-white rounded-full p-3 hover:bg-gray-800 transition-colors"
+              className="bg-black text-white rounded-full p-2 hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading}
+              style={{ minWidth: 'auto', border: 'none' }}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
             </Button>
           </View>
+          {image && (
+            <View className="mt-3 flex items-center gap-2 bg-purple-50 p-2 rounded-lg" style={{ display: 'flex', alignItems: 'center' }}>
+              <View className="relative w-12 h-12 rounded-lg overflow-hidden border-2 border-purple-600 flex-shrink-0">
+                <Image
+                  src={`data:${image.mimeType};base64,${image.data}`}
+                  className="w-full h-full object-cover"
+                />
+              </View>
+              <Text className="text-sm text-gray-700 flex-1">Imagem selecionada</Text>
+              <Button
+                onClick={() => setImage(null)}
+                className="p-1.5 bg-transparent hover:bg-red-100 rounded-full transition-colors"
+                style={{
+                  minWidth: 'auto',
+                  border: 'none',
+                  color: '#ef4444'
+                }}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </Button>
+            </View>
+          )}
         </View>
 
         {/* Products Grid */}
