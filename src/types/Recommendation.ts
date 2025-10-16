@@ -23,7 +23,7 @@ export interface StyleSegmentationItem {
   description: string;
   keywords: string[];
   searchQuery: string;
-  categoryId: string;
-  subcategoryId: string;
+  categoryName: string;
+  subcategoryName: string;
   facet?: string;
 }

@@ -12,6 +12,7 @@ import { Vtex } from 'eitri-shopping-vtex-shared'
 
 import { AgentRole, useAgent } from "eitri-agents";
 import { OptimizeProductResponse } from "../types/Product";
+import { Category } from "@/types/Category";
 
 type CategoryProducts = {
   [category: string]: OptimizeProductResponse[];
@@ -48,10 +49,41 @@ export default function SearchPage() {
 
   const agent = useAgent("Fashion", {
     verbose: true,
+    knowledgeBasePrompt: 'Use as categorias abaixo para melhorar a inferência para busca dos Facets para ter uma precisão maior na busca de produtos. Use apenas as categorias abaixo.',
     // llm: 'openai',
-    // model: 'gpt-5-mini'
+    // model: 'gpt-5'
   });
 
+
+  const setKnowledge = async () => {
+    setIsLoading(true);
+    const categories: Category[] = await Vtex.catalog.getCategoryTree(2);
+
+    // await agent.knowledge.clearKnowledgeBase()
+
+    const preparedCategories = categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      children: category.children.map((child) => ({
+        id: child.id,
+        name: child.name,
+      }))
+    }))
+
+    const data = preparedCategories.map((category) => ({
+      id: String(category.id),
+      content: JSON.stringify(category)
+    }))
+
+    await agent.initializeKnowledgeBase(data)
+
+
+    setIsLoading(false);
+  }
+
+  useEffect(() => {
+    setKnowledge();
+  }, []);
 
   const handleSearch = async (query: string) => {
     if (!query.trim()) {
