@@ -1,6 +1,6 @@
 import { Text, View, Button, Page, TextInput, Image } from "eitri-luminus";
 import { useEffect, useState } from "react";
-import { HiMicrophone, HiStop, HiCamera } from "react-icons/hi";
+import { HiMicrophone, HiStop, HiCamera, HiPaperAirplane } from "react-icons/hi";
 import { Vtex } from "eitri-shopping-vtex-shared";
 import Eitri from "eitri-bifrost";
 
@@ -101,7 +101,7 @@ const AILoadingComponent = ({ status }: { status: any }) => {
             width: "80px",
             height: "80px",
             borderRadius: "50%",
-            backgroundColor: "rgba(102, 126, 234, 0.2)",
+            backgroundColor: "rgba(0, 0, 0, 0.05)",
             transform: `scale(${pulseScale})`,
             transition: "transform 1s cubic-bezier(0.4, 0, 0.6, 1)",
           }}
@@ -114,8 +114,8 @@ const AILoadingComponent = ({ status }: { status: any }) => {
             width: "80px",
             height: "80px",
             borderRadius: "50%",
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            boxShadow: "0 8px 32px rgba(102, 126, 234, 0.4)",
+            background: "linear-gradient(135deg, #374151 0%, #1f2937 100%)",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -267,6 +267,8 @@ export default function SearchPage() {
         return;
       }
 
+
+
       // Filter out empty categories
       const filteredProducts: CategoryProducts = {};
       Object.entries(jsonData).forEach(([category, products]) => {
@@ -367,101 +369,9 @@ export default function SearchPage() {
       className="w-full h-screen bg-white flex flex-col"
       statusBarTextColor="black"
     >
-      <View className="w-full max-w-6xl mx-auto flex flex-col h-full pt-12">
-        {/* Search Bar with Camera Icon */}
-        <View className="p-4 bg-white border-b border-gray-200">
-          <View
-            className="flex items-center gap-3 bg-gray-100 rounded-full px-2 py-2"
-            style={{ display: "flex", alignItems: "center" }}
-          >
-            <Button
-              onClick={handleImagePick}
-              className={`p-2 bg-transparent hover:bg-gray-200 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${image ? "text-primary" : "text-gray-400"
-                }`}
-              disabled={isLoading}
-              style={{
-                minWidth: "auto",
-                border: "none",
-              }}
-            >
-              <HiCamera className="w-5 h-5 text-gray-400" />
-            </Button>
-            <TextInput
-              className="flex-1 bg-transparent border-none focus:outline-none text-gray-700 placeholder-gray-500"
-              style={{ outline: "none", border: "none" }}
-              value={value}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setValue(e.target.value)
-              }
-              onKeyUp={handleKeyPress}
-              placeholder={
-                image ? "Busca por imagem ativa" : "Ex: Look para inverno"
-              }
-              disabled={isLoading}
-            />
-            <Button
-              onClick={() => handleSearch(value)}
-              className="bg-black text-white rounded-full p-2 hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoading}
-              style={{ minWidth: "auto", border: "none" }}
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M14 5l7 7m0 0l-7 7m7-7H3"
-                />
-              </svg>
-            </Button>
-          </View>
-          {image && (
-            <View
-              className="mt-3 flex items-center gap-2 bg-primary/10 p-2 rounded-lg"
-              style={{ display: "flex", alignItems: "center" }}
-            >
-              <View className="relative w-12 h-12 rounded-lg overflow-hidden border-2 border-primary flex-shrink-0">
-                <Image
-                  src={`data:${image.mimeType};base64,${image.data}`}
-                  className="w-full h-full object-cover"
-                />
-              </View>
-              <Text className="text-sm text-gray-700 flex-1">
-                Imagem selecionada
-              </Text>
-              <Button
-                onClick={() => setImage(null)}
-                className="p-1.5 bg-transparent hover:bg-red-100 rounded-full transition-colors text-red-500"
-                style={{
-                  minWidth: "auto",
-                  border: "none",
-                }}
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </Button>
-            </View>
-          )}
-        </View>
-
-        {/* Products Grid */}
-        <View className="flex-1 overflow-y-auto p-4 bg-white">
+      <View className="w-full max-w-6xl mx-auto flex flex-col h-full">
+        {/* Products Grid - Now takes full space minus bottom input */}
+        <View className="flex-1 overflow-y-auto p-4 bg-white" style={{ paddingBottom: "120px" }}>
           {isLoading ? (
             <AILoadingComponent status={agent.status} />
           ) : Object.keys(searchResults).length === 0 ? (
@@ -565,31 +475,125 @@ export default function SearchPage() {
           )}
         </View>
 
-        {/* Floating Voice Button */}
-        <View className="fixed bottom-8 right-8 z-50">
-          <Button
-            onClick={handleVoiceSearch}
-            disabled={isLoading || isListening}
-            className={`rounded-full shadow-2xl transition-all duration-300 border-0 ${isListening
-                ? "w-16 h-16 bg-red-500 hover:bg-red-600 shadow-[0_0_40px_rgba(239,68,68,0.6)] animate-pulse"
-                : "w-14 h-14 bg-primary hover:bg-primary/90 hover:scale-110 shadow-primary/50 shadow-lg"
-              }`}
-            style={{
-              minWidth: "auto",
-              border: "none",
-            }}
-          >
-            {isListening ? (
-              <HiStop className="w-8 h-8 text-white drop-shadow-lg" />
-            ) : (
-              <HiMicrophone className="w-7 h-7 text-white drop-shadow-lg" />
+        {/* Fixed Bottom Search Bar */}
+        <View
+          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg"
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 50,
+            paddingBottom: "env(safe-area-inset-bottom)"
+          }}
+        >
+          <View className="w-full max-w-6xl mx-auto px-4 pt-4 pb-6">
+            {image && (
+              <View
+                className="mb-3 flex items-center gap-2 bg-primary/10 p-2 rounded-lg"
+                style={{ display: "flex", alignItems: "center" }}
+              >
+                <View className="relative w-12 h-12 rounded-lg overflow-hidden border-2 border-primary flex-shrink-0">
+                  <Image
+                    src={`data:${image.mimeType};base64,${image.data}`}
+                    className="w-full h-full object-cover"
+                  />
+                </View>
+                <Text className="text-sm text-gray-700 flex-1">
+                  Imagem selecionada
+                </Text>
+                <Button
+                  onClick={() => setImage(null)}
+                  className="p-1.5 bg-transparent hover:bg-red-100 rounded-full transition-colors text-red-500"
+                  style={{
+                    minWidth: "auto",
+                    border: "none",
+                  }}
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </Button>
+              </View>
             )}
-          </Button>
-          {isListening && (
-            <Text className="absolute -top-8 left-1/2 transform -translate-x-1/2 text-xs text-gray-700 bg-white px-3 py-1 rounded-full shadow-lg whitespace-nowrap">
-              Escutando...
-            </Text>
-          )}
+
+            {/* Main Input Container */}
+            <View
+              className="w-full flex items-center gap-2 bg-gray-100 rounded-2xl px-3 py-3"
+              style={{ display: "flex", alignItems: "center" }}
+            >
+              <Button
+                onClick={handleImagePick}
+                className={`bg-transparent hover:bg-gray-200 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${image ? "text-primary" : "text-gray-400"
+                  }`}
+                disabled={isLoading}
+                style={{
+                  minWidth: "auto",
+                  border: "none",
+                }}
+              >
+                <HiCamera className="w-3 h-3 text-gray-400" />
+              </Button>
+
+              <TextInput
+                className="w-full bg-transparent border-none focus:outline-none text-gray-700 placeholder-gray-500 text-base"
+                style={{ outline: "none", border: "none", fontSize: "16px" }}
+                value={value}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setValue(e.target.value)
+                }
+                onKeyUp={handleKeyPress}
+                placeholder={
+                  image ? "Busca por imagem ativa" : "Busque produto ou ocasião"
+                }
+                disabled={isLoading}
+              />
+
+              <Button
+                onClick={handleVoiceSearch}
+                disabled={isLoading || isListening}
+                className={`rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isListening
+                  ? "bg-red-500 hover:bg-red-600 animate-pulse"
+                  : "bg-transparent hover:bg-gray-200"
+                  }`}
+                style={{
+                  minWidth: "auto",
+                  border: "none",
+                }}
+              >
+                {isListening ? (
+                  <HiStop className="w-3 h-3 text-white" />
+                ) : (
+                  <HiMicrophone className="w-3 h-3 text-gray-400" />
+                )}
+              </Button>
+
+              <Button
+                onClick={() => handleSearch(value)}
+                className="bg-black text-white rounded-full hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isLoading}
+                style={{ minWidth: "auto", border: "none" }}
+              >
+                <HiPaperAirplane className="w-3 h-3 rotate-90" />
+              </Button>
+            </View>
+
+            {isListening && (
+              <Text className="text-xs text-center text-gray-500 mt-2">
+                Escutando...
+              </Text>
+            )}
+          </View>
         </View>
       </View>
     </Page>

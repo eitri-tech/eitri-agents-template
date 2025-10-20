@@ -6,7 +6,7 @@ module.exports = {
   "eitri-bifrost": "3.10.0",
   "eitri-commons": "2.1.3",
   "eitri-agents": "1.9.8",
-  version: "0.1.25",
+  version: "0.1.26",
   "public-key": "12869e02-4605-490b-8539-dc730d17281e",
   applicationId: "dc690c9d-aa0e-48c1-8fb2-f8e525529249",
   id: "9ce99fa0-9557-4e53-ba25-1256dfd21c34",
