@@ -368,8 +368,9 @@ export default function SearchPage() {
     <Page
       className="w-full h-screen bg-white flex flex-col"
       statusBarTextColor="black"
+      topInset
     >
-      <View className="w-full max-w-6xl mx-auto flex flex-col h-full">
+      <View className="w-full max-w-6xl mx-auto flex flex-col h-full pt-8">
         {/* Products Grid - Now takes full space minus bottom input */}
         <View className="flex-1 overflow-y-auto p-4 bg-white" style={{ paddingBottom: "120px" }}>
           {isLoading ? (
@@ -422,7 +423,7 @@ export default function SearchPage() {
             </View>
           ) : (
             <View
-              className="space-y-8"
+              className="space-y-4"
               style={{ display: "flex", flexDirection: "column", gap: "2rem" }}
             >
               {Object.entries(searchResults).map(([category, products]) => (
@@ -477,7 +478,7 @@ export default function SearchPage() {
 
         {/* Fixed Bottom Search Bar */}
         <View
-          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg"
+          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg mt-8"
           style={{
             position: "fixed",
             bottom: 0,
