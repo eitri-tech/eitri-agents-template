@@ -12,30 +12,46 @@ import Eitri from "eitri-bifrost";
 import { AgentRole, useAgent } from "eitri-agents";
 import { OptimizeProductResponse } from "../types/Product";
 import { Category } from "@/types/Category";
+import { StyleSegmentation, StyleSegmentationItem } from "@/types/Recommendation";
 
-type CategoryProducts = {
-  [category: string]: OptimizeProductResponse[];
+type CategoryLoadingState = {
+  [category: string]: {
+    isLoading: boolean;
+    products: OptimizeProductResponse[];
+    description?: string;
+  };
 };
 
 const ProductSkeleton = () => (
   <View
-    className="flex-shrink-0 w-40 rounded-2xl overflow-hidden shadow-md bg-gray-50 animate-pulse"
-    style={{ display: "flex", flexDirection: "column" }}
+    className="shrink-0 rounded-2xl overflow-hidden shadow-md bg-white animate-pulse"
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      width: "160px",
+      minWidth: "160px",
+    }}
   >
     <View className="relative aspect-[3/4] bg-gray-200"></View>
-    <View className="p-3" style={{ display: "flex", flexDirection: "column" }}>
-      <View className="h-4 bg-gray-200 rounded mb-2"></View>
-      <View className="h-4 bg-gray-200 rounded w-2/3 mb-1"></View>
-      <View className="h-5 bg-gray-200 rounded w-1/2"></View>
+    <View
+      className="p-3"
+      style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}
+    >
+      <View className="h-4 bg-gray-200 rounded"></View>
+      <View className="h-4 bg-gray-200 rounded w-2/3"></View>
+      <View className="h-5 bg-gray-200 rounded w-1/2 mt-1"></View>
     </View>
   </View>
 );
 
 const CategorySkeleton = () => (
-  <View style={{ display: "flex", flexDirection: "column" }}>
-    <View className="h-7 bg-gray-200 rounded w-48 mb-4 px-2 animate-pulse"></View>
+  <View style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+    <View className="px-2" style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+      <View className="h-7 bg-gray-200 rounded w-48 animate-pulse"></View>
+      <View className="h-4 bg-gray-200 rounded w-64 animate-pulse"></View>
+    </View>
     <View className="overflow-x-auto scrollbar-hide">
-      <View className="flex flex-row gap-4 pb-2">
+      <View className="flex flex-row gap-4 pb-4 px-2">
         {[1, 2, 3, 4].map((i) => (
           <ProductSkeleton key={i} />
         ))}
@@ -178,10 +194,41 @@ const AILoadingComponent = ({ status }: { status: any }) => {
   );
 };
 
+// Function to search products for a single item
+const searchProductsForItem = async (
+  item: StyleSegmentationItem
+): Promise<{ name: string; products: OptimizeProductResponse[] }> => {
+  const facet = item.facet || "";
+
+  console.log("Buscando produto pelo facet: ", facet);
+
+  try {
+    const result = await Vtex.catalog.getProductsByFacets(facet, {
+      hideUnavailableItems: true,
+    });
+
+    return {
+      name: item.name,
+      products: result.products.map((product: any) => ({
+        productId: product.productId,
+        productName: product.productName,
+        imageUrl: product.items?.[0]?.images[0]?.imageUrl,
+        price: product.items?.[0]?.sellers?.[0]?.commertialOffer?.Price,
+      })),
+    };
+  } catch (error) {
+    console.error(`Erro ao buscar produtos para ${item.name}:`, error);
+    return {
+      name: item.name,
+      products: [],
+    };
+  }
+};
+
 export default function SearchPage() {
   const [value, setValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [searchResults, setSearchResults] = useState<CategoryProducts>({});
+  const [categoryStates, setCategoryStates] = useState<CategoryLoadingState>({});
   const [image, setImage] = useState<{ data: string; mimeType: string } | null>(
     null
   );
@@ -236,6 +283,47 @@ export default function SearchPage() {
     setKnowledge();
   }, []);
 
+  // Process style segmentation and load products progressively
+  const processStyleSegmentation = async (styleSegmentation: StyleSegmentation) => {
+    // Initialize category states with loading skeletons
+    const initialStates: CategoryLoadingState = {};
+    styleSegmentation.items.forEach((item) => {
+      initialStates[item.name] = {
+        isLoading: true,
+        products: [],
+        description: item.description,
+      };
+    });
+    setCategoryStates(initialStates);
+
+    // Load products for each item independently
+    styleSegmentation.items.forEach(async (item) => {
+      try {
+        const result = await searchProductsForItem(item);
+
+        // Update state for this specific category
+        setCategoryStates((prev) => ({
+          ...prev,
+          [result.name]: {
+            isLoading: false,
+            products: result.products,
+            description: item.description,
+          },
+        }));
+      } catch (error) {
+        console.error(`Erro ao carregar produtos para ${item.name}:`, error);
+        setCategoryStates((prev) => ({
+          ...prev,
+          [item.name]: {
+            isLoading: false,
+            products: [],
+            description: item.description,
+          },
+        }));
+      }
+    });
+  };
+
   const handleImagePick = async () => {
     try {
       const files = await Eitri.fs.openFilePicker({
@@ -279,33 +367,24 @@ export default function SearchPage() {
             data: imageData.data,
           },
         },
-        { skipSentToolResultToAgent: ["getProductsByBaseStyle"] }
+        { skipSentToolResultToAgent: ["getFacets"] }
       );
 
-      const jsonData = response.rawToolResult as Record<
-        string,
-        OptimizeProductResponse[]
-      >;
+      const styleSegmentation = response.rawToolResult as StyleSegmentation;
 
-      if (!jsonData || Object.keys(jsonData).length === 0) {
-        console.warn(jsonData);
-        setSearchResults({});
+      if (!styleSegmentation || !styleSegmentation.items || styleSegmentation.items.length === 0) {
+        console.warn("Nenhum item retornado:", styleSegmentation);
+        setCategoryStates({});
+        setIsLoading(false);
         return;
       }
 
-      // Filter out empty categories
-      const filteredProducts: CategoryProducts = {};
-      Object.entries(jsonData).forEach(([category, products]) => {
-        if (Array.isArray(products) && products.length > 0) {
-          filteredProducts[category] = products;
-        }
-      });
-
-      setSearchResults(filteredProducts);
+      // Process style segmentation and load products progressively
+      setIsLoading(false);
+      await processStyleSegmentation(styleSegmentation);
     } catch (error) {
       console.error("Error searching with image:", error);
-      setSearchResults({});
-    } finally {
+      setCategoryStates({});
       setIsLoading(false);
     }
   };
@@ -326,34 +405,25 @@ export default function SearchPage() {
           content: query,
         },
         {
-          skipSentToolResultToAgent: ["getProductsByBaseStyle"],
+          skipSentToolResultToAgent: ["getFacets"],
         }
       );
 
-      const jsonData = response.rawToolResult as Record<
-        string,
-        OptimizeProductResponse[]
-      >;
+      const styleSegmentation = response.rawToolResult as StyleSegmentation;
 
-      if (Object.keys(jsonData).length === 0) {
-        console.warn(jsonData);
-        setSearchResults({});
+      if (!styleSegmentation || !styleSegmentation.items || styleSegmentation.items.length === 0) {
+        console.warn("Nenhum item retornado:", styleSegmentation);
+        setCategoryStates({});
+        setIsLoading(false);
         return;
       }
 
-      // Filter out empty categories
-      const filteredProducts: CategoryProducts = {};
-      Object.entries(jsonData).forEach(([category, products]) => {
-        if (Array.isArray(products) && products.length > 0) {
-          filteredProducts[category] = products;
-        }
-      });
-
-      setSearchResults(filteredProducts);
+      // Process style segmentation and load products progressively
+      setIsLoading(false);
+      await processStyleSegmentation(styleSegmentation);
     } catch (error) {
       console.error("Error searching:", error);
-      setSearchResults({});
-    } finally {
+      setCategoryStates({});
       setIsLoading(false);
     }
   };
@@ -405,15 +475,20 @@ export default function SearchPage() {
       statusBarTextColor="black"
       topInset
     >
-      <View className="w-full max-w-6xl mx-auto flex flex-col h-full pt-8">
+      <View className="w-full max-w-6xl mx-auto flex flex-col h-full">
         {/* Products Grid - Now takes full space minus bottom input */}
         <View
-          className="flex-1 overflow-y-auto p-4 bg-white"
-          style={{ paddingBottom: "120px" }}
+          className="flex-1 overflow-y-auto bg-white"
+          style={{
+            paddingTop: "2rem",
+            paddingLeft: "1rem",
+            paddingRight: "1rem",
+            paddingBottom: image ? "200px" : "140px"
+          }}
         >
           {isLoading ? (
             <AILoadingComponent status={agent.status} />
-          ) : Object.keys(searchResults).length === 0 ? (
+          ) : Object.keys(categoryStates).length === 0 ? (
             <View
               className="h-full items-center justify-center"
               style={{ display: "flex", flexDirection: "column" }}
@@ -462,51 +537,81 @@ export default function SearchPage() {
           ) : (
             <View
               className="space-y-4"
-              style={{ display: "flex", flexDirection: "column", gap: "2rem" }}
+              style={{ display: "flex", flexDirection: "column", gap: "2.5rem" }}
             >
-              {Object.entries(searchResults).map(([category, products]) => (
+              {Object.entries(categoryStates).map(([category, state]) => (
                 <View
                   key={category}
-                  style={{ display: "flex", flexDirection: "column" }}
+                  style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
                 >
-                  {/* Category Title */}
-                  <Text className="text-xl font-bold text-gray-900 mb-4 px-2">
-                    {category}
-                  </Text>
+                  {/* Category Header */}
+                  <View
+                    className="px-2"
+                    style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}
+                  >
+                    <Text className="text-xl font-bold text-gray-900">
+                      {category}
+                    </Text>
+                    {state.description && (
+                      <Text className="text-sm text-gray-600 leading-relaxed">
+                        {state.description}
+                      </Text>
+                    )}
+                  </View>
 
-                  {/* Horizontal Scrollable Product List */}
+                  {/* Horizontal Scrollable Product List or Skeleton */}
                   <View className="overflow-x-auto scrollbar-hide">
-                    <View className="flex flex-row gap-4 pb-8">
-                      {products.map((product) => (
-                        <View
-                          key={product.productId}
-                          className="flex-shrink-0 w-40 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer bg-gray-50"
-                          style={{ display: "flex", flexDirection: "column" }}
-                          onClick={() => handleProductClick(product.productId)}
-                        >
-                          <View className="relative aspect-[3/4]">
-                            <Image
-                              src={product.imageUrl}
-                              alt={product.productName}
-                              className="w-full h-full object-cover"
-                            />
-                          </View>
+                    <View className="flex flex-row gap-4 pb-4 px-2">
+                      {state.isLoading ? (
+                        // Show skeletons while loading
+                        [1, 2, 3, 4].map((i) => <ProductSkeleton key={i} />)
+                      ) : state.products.length > 0 ? (
+                        // Show products when loaded
+                        state.products.map((product) => (
                           <View
-                            className="p-3"
-                            style={{ display: "flex", flexDirection: "column" }}
+                            key={product.productId}
+                            className="shrink-0 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer bg-white"
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              width: "160px",
+                              minWidth: "160px",
+                            }}
+                            onClick={() => handleProductClick(product.productId)}
                           >
-                            <Text className="text-gray-900 font-semibold text-sm mb-1 line-clamp-2">
-                              {product.productName}
-                            </Text>
-                            <Text className="text-primary font-bold text-base">
-                              {product.price.toLocaleString("pt-BR", {
-                                style: "currency",
-                                currency: "BRL",
-                              })}
-                            </Text>
+                            <View className="relative aspect-[3/4]">
+                              <Image
+                                src={product.imageUrl}
+                                alt={product.productName}
+                                className="w-full h-full object-cover"
+                              />
+                            </View>
+                            <View
+                              className="p-3"
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "0.25rem",
+                              }}
+                            >
+                              <Text className="text-gray-900 font-semibold text-sm line-clamp-2">
+                                {product.productName}
+                              </Text>
+                              <Text className="text-primary font-bold text-base">
+                                {product.price.toLocaleString("pt-BR", {
+                                  style: "currency",
+                                  currency: "BRL",
+                                })}
+                              </Text>
+                            </View>
                           </View>
-                        </View>
-                      ))}
+                        ))
+                      ) : (
+                        // Show message when no products found
+                        <Text className="text-gray-500 text-sm px-2">
+                          Nenhum produto encontrado para esta categoria
+                        </Text>
+                      )}
                     </View>
                   </View>
                 </View>
@@ -517,14 +622,16 @@ export default function SearchPage() {
 
         {/* Fixed Bottom Search Bar */}
         <View
-          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg mt-8"
+          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200"
           style={{
             position: "fixed",
             bottom: 0,
             left: 0,
             right: 0,
-            zIndex: 50,
+            zIndex: 100,
             paddingBottom: "env(safe-area-inset-bottom)",
+            backgroundColor: "white",
+            boxShadow: "0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)",
           }}
         >
           <View className="w-full max-w-6xl mx-auto px-4 pt-4 pb-6">
@@ -533,7 +640,7 @@ export default function SearchPage() {
                 className="mb-3 flex items-center gap-2 bg-primary/10 p-2 rounded-lg"
                 style={{ display: "flex", alignItems: "center" }}
               >
-                <View className="relative w-12 h-12 rounded-lg overflow-hidden border-2 border-primary flex-shrink-0">
+                <View className="relative w-12 h-12 rounded-lg overflow-hidden border-2 border-primary shrink-0">
                   <Image
                     src={`data:${image.mimeType};base64,${image.data}`}
                     className="w-full h-full object-cover"
