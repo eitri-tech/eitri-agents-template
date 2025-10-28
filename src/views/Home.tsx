@@ -51,7 +51,7 @@ export default function Home(props) {
           className="mt-4 w-full"
           onClick={async () =>
             await Eitri.navigation.navigate({
-              path: "/Audio",
+              path: "/Speech",
             })
           }
         >

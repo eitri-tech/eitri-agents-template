@@ -1,6 +1,11 @@
 import { Text, View, Button, Page, TextInput, Image } from "eitri-luminus";
 import { useEffect, useState } from "react";
-import { HiMicrophone, HiStop, HiCamera, HiPaperAirplane } from "react-icons/hi";
+import {
+  HiMicrophone,
+  HiStop,
+  HiCamera,
+  HiPaperAirplane,
+} from "react-icons/hi";
 import { Vtex } from "eitri-shopping-vtex-shared";
 import Eitri from "eitri-bifrost";
 
@@ -55,8 +60,14 @@ const AILoadingComponent = ({ status }: { status: any }) => {
         const newStates = [...prev];
         const time = Date.now() % 1400;
         newStates[0] = time < 560 ? Math.sin((time / 560) * Math.PI) : 0;
-        newStates[1] = time >= 160 && time < 720 ? Math.sin(((time - 160) / 560) * Math.PI) : 0;
-        newStates[2] = time >= 320 && time < 880 ? Math.sin(((time - 320) / 560) * Math.PI) : 0;
+        newStates[1] =
+          time >= 160 && time < 720
+            ? Math.sin(((time - 160) / 560) * Math.PI)
+            : 0;
+        newStates[2] =
+          time >= 320 && time < 880
+            ? Math.sin(((time - 320) / 560) * Math.PI)
+            : 0;
         return newStates;
       });
     }, 50);
@@ -151,9 +162,7 @@ const AILoadingComponent = ({ status }: { status: any }) => {
         <Text className="text-lg font-semibold text-gray-800">
           {getStatusMessage()}
         </Text>
-        <Text className="text-sm text-gray-500">
-          Aguarde alguns instantes
-        </Text>
+        <Text className="text-sm text-gray-500">Aguarde alguns instantes</Text>
       </View>
 
       {/* Loading skeleton preview */}
@@ -177,6 +186,16 @@ export default function SearchPage() {
     null
   );
   const [isListening, setIsListening] = useState(false);
+  const [categories, setCategories] = useState<
+    {
+      id: number;
+      name: string;
+      children: {
+        id: number;
+        name: string;
+      }[];
+    }[]
+  >([]);
 
   const agent = useAgent("Fashion", {
     verbose: true,
@@ -184,13 +203,13 @@ export default function SearchPage() {
       "Use as categorias abaixo para melhorar a inferência para busca dos Facets para ter uma precisão maior na busca de produtos. Use apenas as categorias abaixo.",
     // llm: 'openai',
     // model: 'gpt-5'
+    llm: "gemini",
+    model: "gemini-2.5-flash",
   });
 
   const setKnowledge = async () => {
     setIsLoading(true);
     const categories: Category[] = await Vtex.catalog.getCategoryTree(2);
-
-    // await agent.knowledge.clearKnowledgeBase()
 
     const preparedCategories = categories.map((category) => ({
       id: category.id,
@@ -200,6 +219,8 @@ export default function SearchPage() {
         name: child.name,
       })),
     }));
+
+    setCategories(preparedCategories);
 
     const data = preparedCategories.map((category) => ({
       id: String(category.id),
@@ -242,18 +263,23 @@ export default function SearchPage() {
     setIsLoading(true);
     setValue(""); // Clear text input when using image
 
+    const prompt =
+      `Forneça uma recomendação de estilo. Foque somente nas roupas e acessórios. Abaixo tenho as categorias da minha loja recomende as categorias relevantes baseado na imagem fornecida, recomende até 5 categorias:
+      CATEGORIAS:
+      ${JSON.stringify(categories)}
+      `.trim();
+
     try {
       const response = await agent.call(
         {
-          content:
-            "Forneça uma recomendação de estilo. Foque somente nas roupas e acessórios.",
+          content: prompt,
           role: AgentRole.User,
           file: {
             mimeType: imageData.mimeType,
             data: imageData.data,
           },
         },
-        { skipSentToolResultToAgent: "getProductsByBaseStyle" }
+        { skipSentToolResultToAgent: ["getProductsByBaseStyle"] }
       );
 
       const jsonData = response.rawToolResult as Record<
@@ -266,8 +292,6 @@ export default function SearchPage() {
         setSearchResults({});
         return;
       }
-
-
 
       // Filter out empty categories
       const filteredProducts: CategoryProducts = {};
@@ -302,7 +326,7 @@ export default function SearchPage() {
           content: query,
         },
         {
-          skipSentToolResultToAgent: "getProductsByBaseStyle",
+          skipSentToolResultToAgent: ["getProductsByBaseStyle"],
         }
       );
 
@@ -364,6 +388,17 @@ export default function SearchPage() {
     }
   };
 
+  const handleProductClick = (productId: string) => {
+    try {
+      Eitri.nativeNavigation.open({
+        slug: "pdp",
+        initParams: { productId },
+      });
+    } catch (error) {
+      console.error("Erro ao abrir a página de detalhes do produto:", error);
+    }
+  };
+
   return (
     <Page
       className="w-full h-screen bg-white flex flex-col"
@@ -372,7 +407,10 @@ export default function SearchPage() {
     >
       <View className="w-full max-w-6xl mx-auto flex flex-col h-full pt-8">
         {/* Products Grid - Now takes full space minus bottom input */}
-        <View className="flex-1 overflow-y-auto p-4 bg-white" style={{ paddingBottom: "120px" }}>
+        <View
+          className="flex-1 overflow-y-auto p-4 bg-white"
+          style={{ paddingBottom: "120px" }}
+        >
           {isLoading ? (
             <AILoadingComponent status={agent.status} />
           ) : Object.keys(searchResults).length === 0 ? (
@@ -438,12 +476,13 @@ export default function SearchPage() {
 
                   {/* Horizontal Scrollable Product List */}
                   <View className="overflow-x-auto scrollbar-hide">
-                    <View className="flex flex-row gap-4 pb-2">
+                    <View className="flex flex-row gap-4 pb-8">
                       {products.map((product) => (
                         <View
                           key={product.productId}
                           className="flex-shrink-0 w-40 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer bg-gray-50"
                           style={{ display: "flex", flexDirection: "column" }}
+                          onClick={() => handleProductClick(product.productId)}
                         >
                           <View className="relative aspect-[3/4]">
                             <Image
@@ -485,7 +524,7 @@ export default function SearchPage() {
             left: 0,
             right: 0,
             zIndex: 50,
-            paddingBottom: "env(safe-area-inset-bottom)"
+            paddingBottom: "env(safe-area-inset-bottom)",
           }}
         >
           <View className="w-full max-w-6xl mx-auto px-4 pt-4 pb-6">
@@ -535,8 +574,9 @@ export default function SearchPage() {
             >
               <Button
                 onClick={handleImagePick}
-                className={`bg-transparent hover:bg-gray-200 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${image ? "text-primary" : "text-gray-400"
-                  }`}
+                className={`bg-transparent hover:bg-gray-200 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  image ? "text-primary" : "text-gray-400"
+                }`}
                 disabled={isLoading}
                 style={{
                   minWidth: "auto",
@@ -563,10 +603,11 @@ export default function SearchPage() {
               <Button
                 onClick={handleVoiceSearch}
                 disabled={isLoading || isListening}
-                className={`rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isListening
-                  ? "bg-red-500 hover:bg-red-600 animate-pulse"
-                  : "bg-transparent hover:bg-gray-200"
-                  }`}
+                className={`rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isListening
+                    ? "bg-red-500 hover:bg-red-600 animate-pulse"
+                    : "bg-transparent hover:bg-gray-200"
+                }`}
                 style={{
                   minWidth: "auto",
                   border: "none",

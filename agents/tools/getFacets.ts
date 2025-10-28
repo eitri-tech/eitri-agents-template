@@ -15,21 +15,23 @@ const search = async (item: StyleSegmentationItem) => {
 
   if (!result.facets) return [];
 
-  return result.facets.map((facet) => ({
-    key: facet.key,
-    name: facet.name,
-    values: facet.values
-      .filter(
-        (facetItem) =>
-          facetItem.name === item.categoryName ||
-          facetItem.name === item.subcategoryName
-      )
-      .map((value) => ({
-        name: value.name,
-        key: value.key,
-        value: value.value,
-      })),
-  }));
+  return result.facets
+    .filter((facet) => facet.values.length > 0)
+    .map((facet) => ({
+      key: facet.key,
+      name: facet.name,
+      values: facet.values
+        .filter(
+          (facetItem) =>
+            facetItem.name === item.categoryName ||
+            facetItem.name === item.subcategoryName
+        )
+        .map((value) => ({
+          name: value.name,
+          key: value.key,
+          value: value.value,
+        })),
+    }));
 };
 
 export default async function getFacets(
